@@ -16,7 +16,6 @@
     "declarationMap": true,
     "sourceMap": true,
     "removeComments": true,
-    "ignoreDeprecations": "6.0",
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,

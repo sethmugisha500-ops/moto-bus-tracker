@@ -1,0 +1,66 @@
+# render.yaml
+services:
+  - type: web
+    name: moto-bus-backend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: moto-bus-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: moto-bus-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://moto-bus-frontend.onrender.com
+      - key: ADMIN_URL
+        value: https://moto-bus-admin.onrender.com
+      - key: ALLOW_ALL_CORS
+        value: true
+      - key: OTP_ENV
+        value: dev
+
+  - type: web
+    name: moto-bus-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://moto-bus-backend.onrender.com/api
+      - key: REACT_APP_SOCKET_URL
+        value: https://moto-bus-backend.onrender.com
+
+  - type: web
+    name: moto-bus-admin
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://moto-bus-backend.onrender.com/api
+      - key: REACT_APP_SOCKET_URL
+        value: https://moto-bus-backend.onrender.com
+
+  - type: redis
+    name: moto-bus-redis
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
+
+databases:
+  - name: moto-bus-db
+    databaseName: motobus
+    user: postgres
+    plan: free

@@ -1,0 +1,194 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  RIDER
+  DRIVER
+  ADMIN
+}
+
+enum RideStatus {
+  PENDING
+  ACCEPTED
+  STARTED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  MOBILE_MONEY
+  WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum VehicleType {
+  MOTO
+  BUS
+  MINIBUS
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String
+  email     String?
+  role      UserRole @default(RIDER)
+  isActive  Boolean  @default(true)
+  isVerified Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  driver       Driver?
+  wallet       Wallet?
+  payments     Payment[]
+  ratings      Rating[]
+  Ride         Ride[]
+  SOSAlert     SOSAlert[]
+  Notification Notification[]
+  otps         OTP[]
+}
+
+model Driver {
+  id            String      @id @default(cuid())
+  userId        String      @unique
+  licenseNumber String      @unique
+  vehicleType   VehicleType
+  vehicleNumber String
+  vehicleModel  String
+  isApproved    Boolean     @default(false)
+  isOnline      Boolean     @default(false)
+  currentLat    Float?
+  currentLng    Float?
+  rating        Float       @default(0)
+  totalTrips    Int         @default(0)
+  totalEarnings Float       @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ratings Rating[]
+  rides   Ride[]
+}
+
+model Ride {
+  id             String        @id @default(cuid())
+  riderId        String
+  driverId       String?
+  status         RideStatus    @default(PENDING)
+  pickupLat      Float
+  pickupLng      Float
+  pickupAddress  String
+  dropoffLat     Float
+  dropoffLng     Float
+  dropoffAddress String
+  distance       Float
+  duration       Int
+  fare           Float
+  paymentMethod  PaymentMethod @default(CASH)
+  paymentStatus  PaymentStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+
+  rider    User       @relation(fields: [riderId], references: [id])
+  driver   Driver?    @relation(fields: [driverId], references: [id])
+  payment  Payment?
+  rating   Rating?
+  SOSAlert SOSAlert[]
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  rideId        String        @unique
+  userId        String
+  amount        Float
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  completedAt   DateTime?
+  createdAt     DateTime      @default(now())
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  rideId    String   @unique
+  riderId   String
+  driverId  String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  ride   Ride   @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  rider  User   @relation(fields: [riderId], references: [id])
+  driver Driver @relation(fields: [driverId], references: [id])
+}
+
+model SOSAlert {
+  id        String   @id @default(cuid())
+  userId    String
+  rideId    String
+  lat       Float
+  lng       Float
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  ride Ride @relation(fields: [rideId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Add OTP Model
+model OTP {
+  id          String   @id @default(cuid())
+  phone       String
+  email       String?
+  otp         String
+  expiresAt   DateTime
+  attempts    Int      @default(0)
+  isUsed      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([phone])
+  @@index([email])
+  @@index([expiresAt])
+}

@@ -1,0 +1,51 @@
+# =======================
+# Dependencies
+# =======================
+**/node_modules
+backend-api/node_modules
+admin-dashboard/node_modules
+mobile-rider-new/node_modules
+mobile-driver/node_modules
+
+# =======================
+# Build Outputs
+# =======================
+.next/
+out/
+build/
+dist/
+
+# =======================
+# Environment Files
+# =======================
+.env
+.env.local
+.env.*.local
+
+# =======================
+# Large Files
+# =======================
+**/*.node
+**/@next/swc-*
+*.log
+
+# =======================
+# Database
+# =======================
+*.db
+*.sqlite
+
+# =======================
+# IDE & OS
+# =======================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# =======================
+# Temporary
+# =======================
+**/temp/
+**/tmp/
+*.tmp

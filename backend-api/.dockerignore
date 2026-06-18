@@ -8,7 +8,6 @@ README.md
 .vscode
 .idea
 coverage
-.nyc_output
 .DS_Store
 *.log
 dist
@@ -16,9 +15,11 @@ build
 tmp
 temp
 uploads
-screenshots
-.vscode
-.DS_Store
-*.log
+*.tsbuildinfo
 .env.local
 .env.*.local
+screenshots
+test
+__tests__
+*.test.ts
+*.spec.ts

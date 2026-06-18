@@ -13,7 +13,7 @@ const server = http.createServer(app);
 const prisma = new PrismaClient();
 
 // Get allowed origins
-const getAllowedOrigins = () => {
+const getAllowedOrigins = (): string | string[] => {
   const origins = [
     // Development
     'http://localhost:3000',
@@ -35,7 +35,7 @@ const getAllowedOrigins = () => {
     // Any other origins from environment
     process.env.FRONTEND_URL,
     process.env.ADMIN_URL,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 
   // If ALLOW_ALL_CORS is true, allow all origins
   if (process.env.ALLOW_ALL_CORS === 'true') {

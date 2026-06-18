@@ -202,7 +202,7 @@ async function main() {
   ];
 
   for (const data of otpData) {
-    await prisma.otp.create({
+    await prisma.oTP.create({
       data: {
         phone: data.phone,
         otp: data.otp,
@@ -561,7 +561,7 @@ async function main() {
   console.log(`   ⭐ Ratings: ${await prisma.rating.count()}`);
   console.log(`   🔔 Notifications: ${await prisma.notification.count()}`);
   console.log(`   👛 Wallets: ${await prisma.wallet.count()}`);
-  console.log(`   🔑 OTPs: ${await prisma.otp.count()}`);
+  console.log(`   🔑 OTPs: ${await prisma.oTP.count()}`);
   console.log(`   🚨 SOS Alerts: ${await prisma.sOSAlert.count()}`);
 
   // Driver details
@@ -599,7 +599,7 @@ async function main() {
   });
 
   console.log('\n🔑 TEST OTPs:');
-  const otps = await prisma.otp.findMany({
+  const otps = await prisma.oTP.findMany({
     where: { isUsed: false },
     take: 5,
   });

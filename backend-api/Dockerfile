@@ -1,6 +1,10 @@
 # backend-api/Dockerfile
 FROM node:18-alpine
 
+# Install necessary packages for Prisma
+RUN apk add --no-cache openssl
+
+# Set working directory
 WORKDIR /app
 
 # Copy package files

@@ -1,3 +1,4 @@
+import { RideStatus } from '@prisma/client';
 import { Router } from 'express';
 import rideController from '../controllers/ride.controller';
 import { authenticate } from '../middleware/auth.middleware';

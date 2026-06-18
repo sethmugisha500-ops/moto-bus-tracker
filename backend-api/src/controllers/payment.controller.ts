@@ -10,12 +10,12 @@ export class PaymentController {
   // Initialize ride payment
   async initializeRidePayment(req: AuthRequest, res: Response) {
     try {
-      const { rideId, paymentMethod } = req.body;
+      const { id, paymentMethod } = req.body;
       const userId = req.user!.id;
 
       const ride = await prisma.ride.findUnique({
-        where: { id: rideId },
-        include: { rider: { include: { user: true } } },
+        where: { id: id },
+        include: { rider: true },
       });
 
       if (!ride) {
@@ -31,17 +31,17 @@ export class PaymentController {
       }
 
       const payment = await flutterwaveService.initializePayment({
-        tx_ref: `RIDE-${rideId}-${Date.now()}`,
+        tx_ref: `RIDE-${id}-${Date.now()}`,
         amount: ride.fare,
         email: user.email || `${user.phone}@motobus.rw`,
         phoneNumber: user.phone,
-        fullName: user.fullName,
+        name: user.name,
         paymentMethod: paymentMethod,
       });
 
       // Save payment record
       await paymentRepo.create({
-        rideId: ride.id,
+        id: ride.id,
         userId: user.id,
         amount: ride.fare,
         method: paymentMethod === 'mobile_money' ? 'MOBILE_MONEY' : 'CARD',
@@ -49,13 +49,13 @@ export class PaymentController {
         transactionId: payment.data?.id?.toString(),
       });
 
-      res.json({
+      return res.json({
         success: true,
         paymentLink: payment.data?.link,
         transactionReference: payment.data?.tx_ref,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -78,7 +78,7 @@ export class PaymentController {
           
           // Update ride payment status
           await prisma.ride.update({
-            where: { id: payment.rideId },
+            where: { id: payment.id },
             data: { paymentStatus: 'COMPLETED' },
           });
 
@@ -105,19 +105,19 @@ export class PaymentController {
         res.redirect(`${process.env.FRONTEND_URL}/payment/failed?ref=${tx_ref}`);
       }
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
   // Driver withdrawal request
   async requestWithdrawal(req: AuthRequest, res: Response) {
     try {
-      const { amount, mobileMoneyNumber } = req.body;
+      const { amount,  } = req.body;
       const userId = req.user!.id;
 
       const driver = await prisma.driver.findUnique({
         where: { userId },
-        include: { user: true },
+        include: {  },
       });
 
       if (!driver) {
@@ -131,10 +131,10 @@ export class PaymentController {
       // Initiate withdrawal via Flutterwave
       const withdrawal = await flutterwaveService.initiateWithdrawal({
         amount: amount,
-        phoneNumber: mobileMoneyNumber || driver.user.phone,
+        phoneNumber: driver?.user?.phone || "",
         email: driver.user.email || `${driver.user.phone}@motobus.rw`,
-        fullName: driver.user.fullName,
-        narration: `Driver earnings withdrawal - ${driver.user.fullName}`,
+        name: driver.user.name,
+        narration: `Driver earnings withdrawal - ${driver.user.name}`,
       });
 
       if (withdrawal.status === 'success') {
@@ -149,26 +149,25 @@ export class PaymentController {
           data: {
             walletId: driver.user.wallet?.id || '',
             amount: -amount,
-            type: 'DEBIT',
-            description: `Withdrawal to ${mobileMoneyNumber || driver.user.phone}`,
+            description: `Withdrawal to ${ || driver.user.phone}`,
             reference: withdrawal.data?.tx_ref,
             status: 'COMPLETED',
           },
         });
 
-        res.json({
+        return res.json({
           success: true,
           message: 'Withdrawal processed successfully',
           transaction,
         });
       } else {
-        res.status(400).json({
+        return res.status(400).json({
           success: false,
           message: withdrawal.message || 'Withdrawal failed',
         });
       }
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -200,13 +199,13 @@ export class PaymentController {
         if (driver) {
           earnings = {
             total: driver.totalEarnings,
-            totalRides: driver.totalRides,
+            totalTrips: driver.totalTrips,
             rating: driver.rating,
           };
         }
       }
 
-      res.json({
+      return res.json({
         success: true,
         balance: wallet.balance,
         currency: wallet.currency,
@@ -214,7 +213,7 @@ export class PaymentController {
         earnings,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -238,7 +237,6 @@ export class PaymentController {
         data: {
           walletId: wallet.id,
           amount: amount,
-          type: 'CREDIT',
           description: `Wallet top-up via ${paymentMethod || 'Mobile Money'}`,
           reference: `TOPUP-${Date.now()}`,
           paymentMethod: paymentMethod === 'mobile_money' ? 'MOBILE_MONEY' : 'CASH',
@@ -246,14 +244,14 @@ export class PaymentController {
         },
       });
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Wallet topped up successfully',
         balance: wallet.balance,
         transaction,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -267,30 +265,30 @@ export class PaymentController {
         include: {
           ride: {
             include: {
-              driver: { include: { user: true } },
+              driver: { include: {  } },
             },
           },
         },
         orderBy: { createdAt: 'desc' },
       });
 
-      res.json({
+      return res.json({
         success: true,
         payments,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
   // Simulate payment for testing
   async simulatePayment(req: AuthRequest, res: Response) {
     try {
-      const { rideId, success = true } = req.body;
+      const { id, success = true } = req.body;
       const userId = req.user!.id;
 
       const ride = await prisma.ride.findUnique({
-        where: { id: rideId },
+        where: { id: id },
       });
 
       if (!ride) {
@@ -299,7 +297,7 @@ export class PaymentController {
 
       if (success) {
         const payment = await paymentRepo.create({
-          rideId: ride.id,
+          id: ride.id,
           userId,
           amount: ride.fare,
           method: 'CASH',
@@ -319,19 +317,19 @@ export class PaymentController {
           });
         }
 
-        res.json({
+        return res.json({
           success: true,
           message: 'Payment simulated successfully',
           payment,
         });
       } else {
-        res.json({
+        return res.json({
           success: false,
           message: 'Payment simulation failed',
         });
       }
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 }

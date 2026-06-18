@@ -1,77 +1,34 @@
-import PaymentRepository from '../repositories/payment.repository';
-import RideRepository from '../repositories/ride.repository';
-import WalletRepository from '../repositories/wallet.repository';
-
-const paymentRepo = new PaymentRepository();
-const rideRepo = new RideRepository();
-const walletRepo = new WalletRepository();
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 export class PaymentService {
-  async processMobileMoney(rideId: string, phoneNumber: string) {
-    const ride = await rideRepo.findById(rideId);
-    
-    if (!ride) throw new Error('Ride not found');
-    
-    const payment = await paymentRepo.create({
-      rideId,
-      userId: ride.riderId,
-      amount: ride.fare,
-      method: 'MOBILE_MONEY',
-      mobileMoneyNumber: phoneNumber,
-      status: 'COMPLETED',
+  async processPayment(id: string, method: string, amount: number, phoneNumber?: string) {
+    const payment = await prisma.payment.create({
+      data: {
+        id,
+        userId: (await prisma.ride.findUnique({ where: { id: id } }))!.riderId,
+        amount,
+        method: method as any,
+        status: 'COMPLETED',
+        completedAt: new Date(),
+      },
     });
-    
-    // Update ride payment status
-    await rideRepo.update(rideId, { paymentStatus: 'COMPLETED' });
-    
-    return payment;
-  }
-
-  async processWalletPayment(rideId: string) {
-    const ride = await rideRepo.findById(rideId);
-    
-    if (!ride) throw new Error('Ride not found');
-    
-    await walletRepo.deductBalance(ride.riderId, ride.fare, `Ride #${rideId}`, rideId);
-    
-    const payment = await paymentRepo.create({
-      rideId,
-      userId: ride.riderId,
-      amount: ride.fare,
-      method: 'WALLET',
-      status: 'COMPLETED',
+    await prisma.ride.update({
+      where: { id: id },
+      data: { paymentStatus: 'COMPLETED' },
     });
-    
-    await rideRepo.update(rideId, { paymentStatus: 'COMPLETED' });
-    
-    return payment;
-  }
-
-  async processCashPayment(rideId: string) {
-    const ride = await rideRepo.findById(rideId);
-    
-    if (!ride) throw new Error('Ride not found');
-    
-    const payment = await paymentRepo.create({
-      rideId,
-      userId: ride.riderId,
-      amount: ride.fare,
-      method: 'CASH',
-      status: 'COMPLETED',
-    });
-    
-    await rideRepo.update(rideId, { paymentStatus: 'COMPLETED' });
-    
     return payment;
   }
 
   async getWalletBalance(userId: string) {
-    return walletRepo.findByUserId(userId);
+    const wallet = await prisma.wallet.findUnique({ where: { userId } });
+    return wallet?.balance || 0;
   }
 
   async topUpWallet(userId: string, amount: number) {
-    return walletRepo.addBalance(userId, amount, 'Wallet top-up', `TOPUP-${Date.now()}`);
+    return prisma.wallet.update({
+      where: { userId },
+      data: { balance: { increment: amount } },
+    });
   }
 }
-
-export default PaymentService;

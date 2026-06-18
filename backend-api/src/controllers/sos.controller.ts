@@ -7,15 +7,15 @@ const notificationService = new NotificationService();
 export class SOSController {
   async triggerSOS(req: Request, res: Response) {
     try {
-      const { rideId, lat, lng } = req.body;
+      const { id, lat, lng } = req.body;
       const userId = req.user!.id;
 
       // Get ride details
       const ride = await prisma.ride.findUnique({
-        where: { id: rideId },
+        where: { id: id },
         include: {
-          rider: { include: { user: true } },
-          driver: { include: { user: true } },
+          rider: true,
+          driver: { include: {  } },
         },
       });
 
@@ -25,16 +25,16 @@ export class SOSController {
 
       // Update ride status
       await prisma.ride.update({
-        where: { id: rideId },
-        data: { status: 'SOS_ACTIVATED', sosActivated: true },
+        where: { id: id },
+        data: { status: 'STARTED', sosActivated: true },
       });
 
       // Create SOS alert record
       const sosAlert = await prisma.sOSAlert.create({
         data: {
           userId,
-          driverId: ride.driverId || undefined,
-          rideId,
+          
+          id,
           lat: lat || ride.pickupLat,
           lng: lng || ride.pickupLng,
           status: 'ACTIVE',
@@ -50,28 +50,28 @@ export class SOSController {
 
       for (const contact of emergencyContacts) {
         // await smsService.sendSOS(contact.phone, {
-        //   userName: ride.rider.user.fullName,
-        //   driverName: ride.driver?.user?.fullName,
+        //   userName: ride.riderIduser.name,
+        //   driverName: ride.driver?.user?.name,
         //   vehicleNumber: ride.driver?.vehicle?.plateNumber,
         //   location: `${lat || ride.pickupLat}, ${lng || ride.pickupLng}`,
-        //   rideId: ride.rideId,
+        //   id: ride.id,
         // });
       }
 
       // Notify admin
       await notificationService.sendToAdmin({
         title: 'SOS Alert Activated',
-        message: `User ${ride.rider.user.fullName} activated SOS on ride ${ride.rideId}`,
-        data: { rideId, sosAlertId: sosAlert.id },
+        message: `User ${ride.riderIduser.name} activated SOS on ride ${ride.id}`,
+        data: { id, sosAlertId: sosAlert.id },
       });
 
-      res.json({
+      return res.json({
         success: true,
         message: 'SOS alert sent. Emergency services have been notified.',
         sosAlert,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -84,18 +84,18 @@ export class SOSController {
         where: { id },
         data: {
           status: 'RESOLVED',
-          resolvedBy: req.user!.id,
+          updatedAt: req.user!.id,
           resolvedAt: new Date(),
         },
       });
 
-      res.json({
+      return res.json({
         success: true,
         message: 'SOS alert resolved',
         sosAlert,
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -104,16 +104,16 @@ export class SOSController {
       const activeAlerts = await prisma.sOSAlert.findMany({
         where: { status: 'ACTIVE' },
         include: {
-          user: true,
-          driver: { include: { user: true, vehicle: true } },
+          
+          driver: { include: {   } },
           ride: true,
         },
         orderBy: { createdAt: 'desc' },
       });
 
-      res.json({ success: true, alerts: activeAlerts });
+      return res.json({ success: true, alerts: activeAlerts });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -122,13 +122,13 @@ export class SOSController {
       const userId = req.user!.id;
       const alerts = await prisma.sOSAlert.findMany({
         where: { userId },
-        include: { ride: true, driver: { include: { user: true } } },
+        include: { ride: true, driver: { include: {  } } },
         orderBy: { createdAt: 'desc' },
       });
 
-      res.json({ success: true, alerts });
+      return res.json({ success: true, alerts });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 }

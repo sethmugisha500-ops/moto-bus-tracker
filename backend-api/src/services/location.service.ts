@@ -4,19 +4,19 @@ import { DriverRepository } from '../repositories/driver.repository';
 const driverRepo = new DriverRepository();
 
 export class LocationService {
-  async updateDriverLocation(driverId: string, lat: number, lng: number, isOnline: boolean) {
+  async updateDriverLocation(id: string, lat: number, lng: number, isOnline: boolean) {
     // Update driver location
-    const driver = await driverRepo.updateLocation(driverId, lat, lng, isOnline);
+    const driver = await driverRepo.updateLocation(id, lat, lng, isOnline);
 
     // Save to location history
     await prisma.driverLocation.upsert({
-      where: { driverId },
-      update: { lat, lng, isActive: isOnline, updatedAt: new Date() },
-      create: { driverId, lat, lng, isActive: isOnline },
+      where: { id },
+      update: { lat, lng, isOnline: isOnline, updatedAt: new Date() },
+      create: { id, lat, lng, isOnline: isOnline },
     });
 
     // Broadcast to nearby riders via WebSocket
-    // io.emit(`driver:${driverId}:location`, { driverId, lat, lng, isOnline });
+    // io.emit(`driver:${id}:location`, { id, lat, lng, isOnline });
 
     return driver;
   }
@@ -25,11 +25,11 @@ export class LocationService {
     return driverRepo.getNearbyDrivers(lat, lng, radiusKm);
   }
 
-  async saveRideLocation(rideId: string, driverId: string, lat: number, lng: number, speed?: number, heading?: number) {
+  async saveRideLocation(id: string, id: string, lat: number, lng: number, speed?: number, heading?: number) {
     return prisma.rideLocation.create({
       data: {
-        rideId,
-        driverId,
+        id,
+        id,
         lat,
         lng,
         speed,
@@ -38,9 +38,9 @@ export class LocationService {
     });
   }
 
-  async getRidePath(rideId: string) {
+  async getRidePath(id: string) {
     return prisma.rideLocation.findMany({
-      where: { rideId },
+      where: { id },
       orderBy: { timestamp: 'asc' },
     });
   }
@@ -61,9 +61,7 @@ export class LocationService {
     return degrees * (Math.PI / 180);
   }
 
-  async estimateETA(distanceKm: number, vehicleType: string): Promise<number> {
-    const speeds = {
-      MOTO: 40, // km/h
+  async estimateETA(distanceKm: number, vehicle, // km/h
       TUKTUK: 30,
       BUS: 25,
     };
@@ -72,12 +70,8 @@ export class LocationService {
     return Math.ceil(timeHours * 60); // return minutes
   }
 
-  async estimateFare(distanceKm: number, vehicleType: string): Promise<number> {
-    const baseFares = {
-      MOTO: 500,
-      TUKTUK: 400,
-      BUS: 300,
-    };
+  async estimateFare(distanceKm: number, vehicle,
+      }
     const perKmRates = {
       MOTO: 300,
       TUKTUK: 200,

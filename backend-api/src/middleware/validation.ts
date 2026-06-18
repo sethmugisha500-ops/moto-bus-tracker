@@ -1,3 +1,4 @@
+import { RideStatus } from '@prisma/client';
 import { Request, Response, NextFunction } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 
@@ -13,22 +14,22 @@ export const validate = (req: Request, res: Response, next: NextFunction) => {
 };
 
 // Auth validations
-export const validateSendOTP = [
+export const validateSendotp = [
   body('phone').isMobilePhone('any').withMessage('Valid phone number required'),
   validate,
 ];
 
-export const validateVerifyOTP = [
+export const validateVerifyotp = [
   body('phone').isMobilePhone('any').withMessage('Valid phone number required'),
-  body('otp').isLength({ min: 6, max: 6 }).withMessage('6-digit OTP required'),
+  body('otp').isLength({ min: 6, max: 6 }).withMessage('6-digit otp required'),
   validate,
 ];
 
 export const validateRegisterDriver = [
   body('phone').isMobilePhone('any').withMessage('Valid phone number required'),
-  body('otp').isLength({ min: 6, max: 6 }).withMessage('6-digit OTP required'),
+  body('otp').isLength({ min: 6, max: 6 }).withMessage('6-digit otp required'),
   body('licenseNumber').notEmpty().withMessage('License number required'),
-  body('experienceYears').isInt({ min: 0 }).withMessage('Valid experience years required'),
+  body('totalTrips').isInt({ min: 0 }).withMessage('Valid experience years required'),
   validate,
 ];
 
@@ -75,24 +76,24 @@ export const validateUpdateLocation = [
 ];
 
 export const validateAcceptRide = [
-  param('rideId').isString().notEmpty().withMessage('Ride ID required'),
+  param('id').isString().notEmpty().withMessage('Ride ID required'),
   validate,
 ];
 
 // Payment validations
 export const validateProcessMobileMoney = [
-  body('rideId').isString().notEmpty().withMessage('Ride ID required'),
+  body('id').isString().notEmpty().withMessage('Ride ID required'),
   body('phoneNumber').isMobilePhone('any').withMessage('Valid mobile money number required'),
   validate,
 ];
 
 export const validateProcessWalletPayment = [
-  body('rideId').isString().notEmpty().withMessage('Ride ID required'),
+  body('id').isString().notEmpty().withMessage('Ride ID required'),
   validate,
 ];
 
 export const validateProcessCashPayment = [
-  body('rideId').isString().notEmpty().withMessage('Ride ID required'),
+  body('id').isString().notEmpty().withMessage('Ride ID required'),
   validate,
 ];
 
@@ -103,7 +104,7 @@ export const validateTopUpWallet = [
 
 // SOS validations
 export const validateTriggerSOS = [
-  body('rideId').isString().notEmpty().withMessage('Ride ID required'),
+  body('id').isString().notEmpty().withMessage('Ride ID required'),
   body('lat').optional().isFloat(),
   body('lng').optional().isFloat(),
   validate,

@@ -1,13 +1,22 @@
+import { RideStatus } from '@prisma/client';
 import prisma from '../config/database';
 
 
 export class RideRepository {
+    async getDashboardStats() {
+        return {
+            totalTrips: await this.count(),
+            activeRides: await this.count({ where: { status: { in: ["PENDING", "ACCEPTED", "STARTED"] } } }),
+            completedRides: await this.count({ where: { status: "COMPLETED" } }),
+            cancelledRides: await this.count({ where: { status: "CANCELLED" } })
+        };
+    }
   async findById(id: string) {
     return prisma.ride.findUnique({
       where: { id },
       include: {
-        rider: { include: { user: true } },
-        driver: { include: { user: true, vehicle: true } },
+        rider: true,
+        driver: { include: {   } },
         locations: true,
         payment: true,
         rating: true,
@@ -20,8 +29,8 @@ export class RideRepository {
       where: { id },
       data,
       include: {
-        rider: { include: { user: true } },
-        driver: { include: { user: true, vehicle: true } },
+        rider: true,
+        driver: { include: {   } },
       },
     });
   }
@@ -43,8 +52,8 @@ export class RideRepository {
     return prisma.ride.create({
       data,
       include: {
-        rider: { include: { user: true } },
-        driver: { include: { user: true, vehicle: true } },
+        rider: true,
+        driver: { include: {   } },
       },
     });
   }
@@ -55,7 +64,7 @@ export class RideRepository {
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
-        driver: { include: { user: true, vehicle: true } },
+        driver: { include: {   } },
         rating: true,
       },
     });
@@ -67,7 +76,7 @@ export class RideRepository {
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
-        rider: { include: { user: true } },
+        rider: true,
         rating: true,
       },
     });

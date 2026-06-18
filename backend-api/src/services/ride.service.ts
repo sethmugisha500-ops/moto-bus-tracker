@@ -1,3 +1,4 @@
+import { RideStatus } from '@prisma/client';
 import { RideRepository } from '../repositories/ride.repository';
 import { DriverRepository } from '../repositories/driver.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
@@ -31,21 +32,21 @@ export class RideService {
       await notificationService.sendToDriver(driver.id, {
         title: 'New Ride Request',
         message: `Distance: ${data.distance}km | Fare: RWF ${data.fare}`,
-        data: { rideId: ride.id },
+        data: { id: ride.id },
       });
     }
     
     return ride;
   }
 
-  async acceptRide(rideId: string, driverId: string) {
-    const ride = await rideRepo.findById(rideId);
+  async acceptRide(id: string, driverId: string) {
+    const ride = await rideRepo.findById(id);
     
     if (!ride || ride.status !== 'PENDING') {
       throw new Error('Ride not available');
     }
     
-    const updatedRide = await rideRepo.update(rideId, {
+    const updatedRide = await rideRepo.update(id, {
       driverId,
       status: 'ACCEPTED',
     });
@@ -54,25 +55,25 @@ export class RideService {
     await notificationService.sendToUser(ride.riderId, {
       title: 'Driver Assigned',
       message: `Your driver is on the way`,
-      data: { rideId },
+      data: { id },
     });
     
     return updatedRide;
   }
 
-  async updateRideStatus(rideId: string, status: string, driverId: string) {
-    const ride = await rideRepo.updateStatus(rideId, status as any);
+  async updateRideStatus(id: string, status: string, driverId: string) {
+    const ride = await rideRepo.updateStatus(id, status as any);
     
     if (status === 'COMPLETED') {
       // Process payment
-      await this.completeRide(rideId);
+      await this.completeRide(id);
     }
     
     return ride;
   }
 
-  async completeRide(rideId: string) {
-    const ride = await rideRepo.findById(rideId);
+  async completeRide(id: string) {
+    const ride = await rideRepo.findById(id);
     
     if (!ride || !ride.driverId) {
       throw new Error('Ride not found');
@@ -80,8 +81,8 @@ export class RideService {
     
     // Process payment based on method
     if (ride.paymentMethod === 'WALLET') {
-      await walletRepo.deductBalance(ride.riderId, ride.fare, `Ride #${rideId}`, rideId);
-      await walletRepo.addBalance(ride.driverId, ride.fare * 0.8, `Ride earnings #${rideId}`, rideId);
+      await walletRepo.deductBalance(ride.riderId, ride.fare, `Ride #${id}`, id);
+      await walletRepo.addBalance(ride.driverId, ride.fare * 0.8, `Ride earnings #${id}`, id);
     }
     
     // Update driver earnings
@@ -90,19 +91,19 @@ export class RideService {
     return ride;
   }
 
-  async cancelRide(rideId: string, userId: string, reason: string) {
-    const ride = await rideRepo.update(rideId, {
+  async cancelRide(id: string, userId: string, reason: string) {
+    const ride = await rideRepo.update(id, {
       status: 'CANCELLED',
       cancelledAt: new Date(),
-      cancellationReason: reason,
+      cancelledAt: reason,
     });
     
     return ride;
   }
 
-  async activateSOS(rideId: string, userId: string) {
-    const ride = await rideRepo.update(rideId, {
-      status: 'SOS_ACTIVATED',
+  async activateSOS(id: string, userId: string) {
+    const ride = await rideRepo.update(id, {
+      status: 'STARTED',
       sosActivated: true,
     });
     

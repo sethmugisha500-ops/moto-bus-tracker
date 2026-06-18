@@ -11,7 +11,7 @@ const router = Router();
 router.post('/auth/register', authController.register.bind(authController));
 router.post('/auth/login', authController.login.bind(authController));
 router.post('/auth/refresh', authController.refreshToken.bind(authController));
-router.post('/auth/forgot-password', authController.forgotPassword.bind(authController));
+router.post('/auth/forgot-password', authController.forgotpassword.bind(authController));
 router.post('/auth/reset-password', authController.resetPassword.bind(authController));
 router.get('/auth/me', authenticate, authController.getCurrentUser.bind(authController));
 router.put('/auth/profile', authenticate, authController.updateProfile.bind(authController));

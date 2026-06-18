@@ -180,12 +180,12 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
 model Otp {
   id        String   @id @default(cuid())
   phone     String
   email     String?
   otp       String
+  type      String?   // <-- Add this line
   expiresAt DateTime
   attempts  Int      @default(0)
   isUsed    Boolean  @default(false)

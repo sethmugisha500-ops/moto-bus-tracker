@@ -6,7 +6,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     phone: string;
-    fullName: string;
+    name: string;
     role: string;
   };
 }
@@ -23,7 +23,7 @@ export const authenticate = async (
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
     
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string as string!) as {
       userId: string;
       role: string;
     };
@@ -33,7 +33,7 @@ export const authenticate = async (
       select: {
         id: true,
         phone: true,
-        fullName: true,
+        name: true,
         role: true,
       },
     });
@@ -55,7 +55,7 @@ export const authorize = (...roles: string[]) => {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
     
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(req.user?.role)) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
     

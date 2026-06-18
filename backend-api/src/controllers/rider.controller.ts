@@ -14,9 +14,9 @@ export class RiderController {
 
       const ride = await rideService.requestRide(riderId, rideData);
 
-      res.json({ success: true, ride });
+      return res.json({ success: true, ride });
     } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
+      return res.status(400).json({ success: false, message: error.message });
     }
   }
 
@@ -31,32 +31,32 @@ export class RiderController {
       const drivers = await prisma.driver.findMany({
         where: {
           isOnline: true,
-          isAvailable: true,
+          isOnline: true,
           isApproved: true,
           currentLat: { gte: Number(lat) - 0.05, lte: Number(lat) + 0.05 },
           currentLng: { gte: Number(lng) - 0.05, lte: Number(lng) + 0.05 },
-          ...(vehicleType && { vehicle: { type: vehicleType as any } }),
+          ...(vehicleType && {  }),
         },
         include: {
-          user: true,
-          vehicle: true,
+          
+          
         },
         take: 20,
       });
 
       const formattedDrivers = drivers.map(driver => ({
         id: driver.id,
-        name: driver.user.fullName,
-        vehicleType: driver.vehicle?.type,
+        name: driver.user.name,
+        vehicle,
         vehicleNumber: driver.vehicle?.plateNumber,
         rating: driver.rating,
         distance: '500m', // Calculate actual distance
         eta: '3 min',
       }));
 
-      res.json({ success: true, drivers: formattedDrivers });
+      return res.json({ success: true, drivers: formattedDrivers });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -70,7 +70,7 @@ export class RiderController {
         prisma.ride.findMany({
           where: { riderId: userId },
           include: {
-            driver: { include: { user: true, vehicle: true } },
+            driver: { include: {   } },
             rating: true,
             payment: true,
           },
@@ -81,7 +81,7 @@ export class RiderController {
         prisma.ride.count({ where: { riderId: userId } }),
       ]);
 
-      res.json({
+      return res.json({
         success: true,
         rides,
         pagination: {
@@ -92,7 +92,7 @@ export class RiderController {
         },
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -104,7 +104,7 @@ export class RiderController {
       const ride = await prisma.ride.findFirst({
         where: { id, riderId: userId },
         include: {
-          driver: { include: { user: true, vehicle: true } },
+          driver: { include: {   } },
           locations: { orderBy: { timestamp: 'asc' } },
           payment: true,
           rating: true,
@@ -115,20 +115,20 @@ export class RiderController {
         return res.status(404).json({ success: false, message: 'Ride not found' });
       }
 
-      res.json({ success: true, ride });
+      return res.json({ success: true, ride });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
   async rateRide(req: Request, res: Response) {
     try {
-      const { rideId } = req.params;
+      const { id } = req.params;
       const { rating, comment } = req.body;
       const userId = req.user!.id;
 
       const ride = await prisma.ride.findFirst({
-        where: { id: rideId, riderId: userId, status: 'COMPLETED' },
+        where: { id: id, riderId: userId, status: 'COMPLETED' },
       });
 
       if (!ride) {
@@ -136,7 +136,7 @@ export class RiderController {
       }
 
       const existingRating = await prisma.rating.findUnique({
-        where: { rideId },
+        where: { id },
       });
 
       if (existingRating) {
@@ -145,7 +145,7 @@ export class RiderController {
 
       const newRating = await prisma.rating.create({
         data: {
-          rideId,
+          id,
           riderId: userId,
           driverId: ride.driverId!,
           rating,
@@ -164,9 +164,9 @@ export class RiderController {
         data: { rating: driverRatings._avg.rating || 0 },
       });
 
-      res.json({ success: true, rating: newRating });
+      return res.json({ success: true, rating: newRating });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 }

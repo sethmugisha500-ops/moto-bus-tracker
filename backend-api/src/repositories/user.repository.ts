@@ -12,17 +12,17 @@ export class UserRepository {
     return prisma.user.findUnique({
       where: { id },
       include: {
-        driver: { include: { vehicle: true } },
+        driver: { include: {  } },
         wallet: true,
       },
     });
   }
 
-  async create(data: { phone: string; fullName: string; email?: string }) {
+  async create(data: { phone: string; name: string; email?: string }) {
     return prisma.user.create({
       data: {
         phone: data.phone,
-        fullName: data.fullName,
+        name: data.name,
         email: data.email,
         wallet: { create: {} },
       },

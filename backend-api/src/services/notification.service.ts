@@ -21,7 +21,6 @@ export class NotificationService {
         userId,
         title: data.title,
         message: data.message,
-        type: data.type || 'SYSTEM',
         data: data.data || {},
       },
     });
@@ -40,7 +39,7 @@ export class NotificationService {
   }) {
     const driver = await prisma.driver.findUnique({
       where: { id: driverId },
-      include: { user: true },
+      include: {  },
     });
 
     if (driver) {
@@ -101,8 +100,7 @@ export class NotificationService {
       await this.sendToDriver(driverId, {
         title: 'New Ride Request',
         message: `Distance: ${rideData.distance}km | Fare: RWF ${rideData.fare}`,
-        type: 'RIDE_REQUEST',
-        data: { rideId: rideData.id },
+        data: { id: rideData.id },
       });
     }
   }
@@ -111,7 +109,6 @@ export class NotificationService {
     await this.sendToRider(riderId, {
       title: 'Driver Assigned',
       message: `${driverName} is on the way. ETA: ${eta} minutes`,
-      type: 'RIDE_ACCEPTED',
       data: { eta },
     });
   }
@@ -120,7 +117,6 @@ export class NotificationService {
     await this.sendToUser(userId, {
       title: 'Ride Completed',
       message: `Your ride is complete. Total fare: RWF ${fare}`,
-      type: 'RIDE_COMPLETED',
       data: { fare },
     });
   }
@@ -129,7 +125,6 @@ export class NotificationService {
     await this.sendToDriver(driverId, {
       title: 'Payment Received',
       message: `You received RWF ${amount} for your completed ride`,
-      type: 'PAYMENT_RECEIVED',
       data: { amount },
     });
   }
@@ -137,21 +132,20 @@ export class NotificationService {
   async sendDriverApprovedNotification(driverId: string) {
     const driver = await prisma.driver.findUnique({
       where: { id: driverId },
-      include: { user: true },
+      include: {  },
     });
 
     if (driver) {
       await this.sendToUser(driver.userId, {
         title: 'Driver Application Approved',
         message: 'Congratulations! You can now accept rides and start earning.',
-        type: 'SYSTEM',
       });
     }
   }
 
   async sendPromotionalNotification(userIds: string[], title: string, message: string) {
     const notifications = await Promise.all(
-      userIds.map(userId => this.sendToUser(userId, { title, message, type: 'PROMOTION' }))
+      userIds.map(userId => this.sendToUser(userId, { title, message}))
     );
     return notifications;
   }

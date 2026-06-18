@@ -14,7 +14,7 @@ const rides: any[] = [];
 
 // ============ AUTH ENDPOINTS ============
 
-// Send OTP
+// Send otp
 app.post('/api/auth/send-otp', (req, res) => {
   const { phone } = req.body;
   
@@ -23,25 +23,25 @@ app.post('/api/auth/send-otp', (req, res) => {
   }
   
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  console.log(`📱 OTP for ${phone}: ${otp}`);
+  console.log(`📱 otp for ${phone}: ${otp}`);
 
   // Return the response to ensure all code paths return a value
   return res.json({ 
     success: true, 
-    message: 'OTP sent successfully',
-    devOtp: otp
+    message: 'otp sent successfully',
+    devotp: otp
   });
 });
 
-// Verify OTP
+// Verify otp
 app.post('/api/auth/verify-otp', (req, res) => {
     const { phone, otp } = req.body;
 
     if (!phone || !otp) {
-      return res.status(400).json({ success: false, message: 'Phone and OTP required' });
+      return res.status(400).json({ success: false, message: 'Phone and otp required' });
     }
 
-    // Accept any 6-digit OTP for testing
+    // Accept any 6-digit otp for testing
     if (otp.length === 6) {
       const token = Buffer.from(JSON.stringify({ userId: Date.now(), phone })).toString('base64');
 
@@ -63,7 +63,7 @@ app.post('/api/auth/verify-otp', (req, res) => {
         },
       });
     } else {
-      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+      return res.status(400).json({ success: false, message: 'Invalid otp' });
     }
   });
 
@@ -71,11 +71,11 @@ app.post('/api/auth/verify-otp', (req, res) => {
 
 // Get nearby drivers
 app.get('/api/riders/nearby-drivers', (req, res) => {
-  res.json({
+  return res.json({
     success: true,
     drivers: [
-      { id: '1', name: 'John Mugabo', vehicleType: 'MOTO', rating: 4.8, distance: '300m', eta: '2 min' },
-      { id: '2', name: 'Peter Nshuti', vehicleType: 'MOTO', rating: 4.9, distance: '500m', eta: '3 min' },
+      { id: '1', name: 'John Mugabo', vehicle, rating: 4.8, distance: '300m', eta: '2 min' },
+      { id: '2', name: 'Peter Nshuti', vehicle, rating: 4.9, distance: '500m', eta: '3 min' },
     ],
   });
 });
@@ -89,31 +89,31 @@ app.post('/api/riders/request-ride', (req, res) => {
     createdAt: new Date(),
   };
   rides.push(ride);
-  res.json({ success: true, ride });
+  return res.json({ success: true, ride });
 });
 
 // Get ride history
 app.get('/api/riders/rides', (req, res) => {
-  res.json({ success: true, rides });
+  return res.json({ success: true, rides });
 });
 
 // ============ DRIVER ENDPOINTS ============
 
 app.post('/api/drivers/location', (req, res) => {
-  res.json({ success: true, message: 'Location updated' });
+  return res.json({ success: true, message: 'Location updated' });
 });
 
 app.get('/api/drivers/nearby-rides', (req, res) => {
   const pendingRides = rides.filter(r => r.status === 'PENDING');
-  res.json({ success: true, rides: pendingRides });
+  return res.json({ success: true, rides: pendingRides });
 });
 
-app.post('/api/drivers/accept-ride/:rideId', (req, res) => {
-  res.json({ success: true, message: 'Ride accepted' });
+app.post('/api/drivers/accept-ride/:id', (req, res) => {
+  return res.json({ success: true, message: 'Ride accepted' });
 });
 
 app.get('/api/drivers/earnings', (req, res) => {
-  res.json({
+  return res.json({
     success: true,
     earnings: { today: { amount: 8500, trips: 4 }, week: { amount: 45600, trips: 18 } },
   });
@@ -122,12 +122,12 @@ app.get('/api/drivers/earnings', (req, res) => {
 // ============ ADMIN ENDPOINTS ============
 
 app.get('/api/admin/stats', (req, res) => {
-  res.json({
+  return res.json({
     success: true,
     stats: {
       totalUsers: users.length,
       totalDrivers: 0,
-      totalRides: rides.length,
+      totalTrips: rides.length,
       totalRevenue: 0,
     },
   });
@@ -135,12 +135,12 @@ app.get('/api/admin/stats', (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  return res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // API Info
 app.get('/api', (req, res) => {
-  res.json({ success: true, message: 'Moto-Bus API is running' });
+  return res.json({ success: true, message: 'Moto-Bus API is running' });
 });
 
 // Start server
@@ -152,7 +152,7 @@ app.listen(PORT, '0.0.0.0', () => {
 ║  Server running on: http://localhost:${PORT}                  ║
 ║  Health: http://localhost:${PORT}/health                      ║
 ║                                                              ║
-║  Test OTP: 123456                                           ║
+║  Test otp: 123456                                           ║
 ║                                                              ║
 ║  Endpoints:                                                 ║
 ║    POST /api/auth/send-otp                                  ║

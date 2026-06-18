@@ -18,7 +18,7 @@ class FlutterwaveService {
     amount: number;
     email: string;
     phoneNumber: string;
-    fullName: string;
+    name: string;
     paymentMethod?: string;
   }) {
     try {
@@ -35,7 +35,7 @@ class FlutterwaveService {
         customer: {
           email: data.email,
           phonenumber: data.phoneNumber,
-          name: data.fullName,
+          name: data.name,
         },
         customizations: {
           title: "Moto-Bus Tracker",
@@ -82,7 +82,7 @@ class FlutterwaveService {
     amount: number;
     phoneNumber: string;
     email: string;
-    fullName: string;
+    name: string;
     narration: string;
   }) {
     try {
@@ -92,9 +92,9 @@ class FlutterwaveService {
         currency: "RWF",
         email: data.email,
         phone_number: data.phoneNumber,
-        fullname: data.fullName,
+        name: data.name,
         narration: data.narration,
-        beneficiary_name: data.fullName,
+        beneficiary_name: data.name,
         beneficiary_phone: data.phoneNumber,
         beneficiary_email: data.email,
       };

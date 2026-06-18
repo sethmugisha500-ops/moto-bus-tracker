@@ -75,7 +75,7 @@ export const errorHandler = (
   }
 
   // Default error
-  res.status(500).json({
+  return res.status(500).json({
     success: false,
     message: process.env.NODE_ENV === 'production'
       ? 'Internal server error'
@@ -92,7 +92,7 @@ export const catchAsync = (fn: Function) => {
 
 // Not found handler
 export const notFound = (req: Request, res: Response) => {
-  res.status(404).json({
+  return res.status(404).json({
     success: false,
     message: `Cannot ${req.method} ${req.url}`,
   });

@@ -1,22 +1,22 @@
 // src/middleware/devAuth.ts
 import { Request, Response, NextFunction } from 'express';
 
-// Development OTP bypass for testing
-export const devOTP = (req: Request, res: Response, next: NextFunction) => {
+// Development otp bypass for testing
+export const devotp = (req: Request, res: Response, next: NextFunction) => {
   // Only allow in development mode
-  if (process.env.NODE_ENV === 'development' || process.env.OTP_ENV === 'dev') {
+  if (process.env.NODE_ENV === 'development' || process.env.otp_ENV === 'dev') {
     const { otp, phone } = req.body;
     
-    // Allow specific test OTPs for development
-    const devOTPs = [
+    // Allow specific test otps for development
+    const devotps = [
       '123456', 
       '000000', 
       '111111', 
-      process.env.DEV_OTP || '123456'
+      process.env.DEV_otp || '123456'
     ];
     
-    if (devOTPs.includes(otp)) {
-      console.log('🔧 Development OTP bypass activated');
+    if (devotps.includes(otp)) {
+      console.log('🔧 Development otp bypass activated');
       req.body.devVerified = true;
       return next();
     }
@@ -41,18 +41,18 @@ export const devOTP = (req: Request, res: Response, next: NextFunction) => {
 
 // Check if request is from development environment
 export const isDevEnvironment = (): boolean => {
-  return process.env.NODE_ENV === 'development' || process.env.OTP_ENV === 'dev';
+  return process.env.NODE_ENV === 'development' || process.env.otp_ENV === 'dev';
 };
 
-// Get development OTP for testing
-export const getDevOTP = (): string => {
-  return process.env.DEV_OTP || '123456';
+// Get development otp for testing
+export const getDevotp = (): string => {
+  return process.env.DEV_otp || '123456';
 };
 
-// Log OTP requests in development
-export const logOTPRequest = (req: Request, res: Response, next: NextFunction) => {
+// Log otp requests in development
+export const logotpRequest = (req: Request, res: Response, next: NextFunction) => {
   if (isDevEnvironment()) {
-    console.log(`📱 OTP Request: ${req.method} ${req.path}`, {
+    console.log(`📱 otp Request: ${req.method} ${req.path}`, {
       phone: req.body.phone,
       email: req.body.email,
       otp: req.body.otp ? '***' : undefined,
@@ -63,7 +63,7 @@ export const logOTPRequest = (req: Request, res: Response, next: NextFunction) =
 };
 
 // Simple rate limiting middleware
-export const rateLimitOTP = (maxRequests: number = 5, windowMs: number = 60000) => {
+export const rateLimitotp = (maxRequests: number = 5, windowMs: number = 60000) => {
   const requests: Map<string, number[]> = new Map();
 
   return (req: Request, res: Response, next: NextFunction) => {

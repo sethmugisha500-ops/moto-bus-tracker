@@ -4,12 +4,12 @@ const router = Router();
 
 // Get nearby drivers
 router.get('/nearby-drivers', (req, res) => {
-  res.json({
+  return res.json({
     success: true,
     drivers: [
-      { id: '1', name: 'John Mugabo', vehicleType: 'MOTO', vehicleNumber: 'MT-001A', rating: 4.8, distance: '300m', eta: '2 min', lat: -1.9441, lng: 30.0619 },
-      { id: '2', name: 'Peter Nshuti', vehicleType: 'MOTO', vehicleNumber: 'MT-002B', rating: 4.9, distance: '500m', eta: '3 min', lat: -1.9450, lng: 30.0625 },
-      { id: '3', name: 'Sarah Uwimana', vehicleType: 'BUS', vehicleNumber: 'BUS-101', rating: 4.7, distance: '800m', eta: '5 min', lat: -1.9430, lng: 30.0600 },
+      { id: '1', name: 'John Mugabo', vehicle, vehicleNumber: 'MT-001A', rating: 4.8, distance: '300m', eta: '2 min', lat: -1.9441, lng: 30.0619 },
+      { id: '2', name: 'Peter Nshuti', vehicle, vehicleNumber: 'MT-002B', rating: 4.9, distance: '500m', eta: '3 min', lat: -1.9450, lng: 30.0625 },
+      { id: '3', name: 'Sarah Uwimana', vehicle, vehicleNumber: 'BUS-101', rating: 4.7, distance: '800m', eta: '5 min', lat: -1.9430, lng: 30.0600 },
     ],
   });
 });
@@ -22,15 +22,15 @@ router.post('/request-ride', (req, res) => {
     status: 'PENDING',
     createdAt: new Date().toISOString(),
   };
-  res.json({ success: true, ride });
+  return res.json({ success: true, ride });
 });
 
 // Get ride status
-router.get('/ride-status/:rideId', (req, res) => {
-  res.json({
+router.get('/ride-status/:id', (req, res) => {
+  return res.json({
     success: true,
     ride: {
-      id: req.params.rideId,
+      id: req.params.id,
       status: 'ACCEPTED',
       driver: { name: 'John Mugabo', phone: '+250788123401', vehicleNumber: 'MT-001A' },
       eta: '3 min',
@@ -41,7 +41,7 @@ router.get('/ride-status/:rideId', (req, res) => {
 
 // Get ride history
 router.get('/rides', (req, res) => {
-  res.json({
+  return res.json({
     success: true,
     rides: [
       { id: '1', pickup: 'Kigali City Tower', destination: 'Kimironko', fare: 1200, status: 'COMPLETED', date: '2024-01-15', rating: 5 },
@@ -52,22 +52,22 @@ router.get('/rides', (req, res) => {
 });
 
 // Rate a ride
-router.post('/rate-ride/:rideId', (req, res) => {
+router.post('/rate-ride/:id', (req, res) => {
   const { rating, comment } = req.body;
-  res.json({
+  return res.json({
     success: true,
     message: 'Rating submitted successfully',
-    rating: { rideId: req.params.rideId, rating, comment },
+    rating: { id: req.params.id, rating, comment },
   });
 });
 
 // Cancel a ride
-router.post('/cancel-ride/:rideId', (req, res) => {
+router.post('/cancel-ride/:id', (req, res) => {
   const { reason } = req.body;
-  res.json({
+  return res.json({
     success: true,
     message: 'Ride cancelled successfully',
-    rideId: req.params.rideId,
+    id: req.params.id,
     reason: reason || 'Cancelled by user',
   });
 });

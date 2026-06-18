@@ -20,7 +20,6 @@ export class WalletRepository {
         data: {
           walletId: wallet.id,
           amount,
-          type: 'CREDIT',
           description,
           reference,
           status: 'COMPLETED',
@@ -38,7 +37,7 @@ export class WalletRepository {
       throw new Error('Insufficient balance');
     }
 
-    return prisma.$transaction(async (tx: { wallet: { update: (arg0: { where: { userId: string; }; data: { balance: { decrement: number; }; }; }) => any; }; transaction: { create: (arg0: { data: { walletId: any; amount: number; type: string; description: string; reference: string | undefined; status: string; }; }) => any; }; }) => {
+    return prisma.$transaction(async (tx: { wallet: { update: (arg0: { where: { userId: string; }; data: { balance: { decrement: number; }; }; }) => any; }; transaction: { create: (arg0: { data: { walletId: any; amount: number;}; }) => any; }; }) => {
       const updatedWallet = await tx.wallet.update({
         where: { userId },
         data: { balance: { decrement: amount } },
@@ -48,7 +47,6 @@ export class WalletRepository {
         data: {
           walletId: wallet.id,
           amount: -amount,
-          type: 'DEBIT',
           description,
           reference,
           status: 'COMPLETED',

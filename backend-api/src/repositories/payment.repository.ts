@@ -2,32 +2,39 @@ import prisma from '../config/database';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
 
 export class PaymentRepository {
+    async getStats() {
+        return {
+            totalPayments: await this.count(),
+            completedPayments: await this.count({ where: { status: "COMPLETED" } }),
+            pendingPayments: await this.count({ where: { status: "PENDING" } }),
+            totalAmount: await this.aggregate({ _sum: { amount: true } })
+        };
+    }
   async create(data: {
-    rideId: string;
+    id: string;
     userId: string;
     amount: number;
     method: PaymentMethod;
-    mobileMoneyNumber?: string;
-    transactionId?: string;
+    transactionId
     status?: PaymentStatus;
   }) {
     return prisma.payment.create({
       data: {
-        rideId: data.rideId,
+        id: data.id,
         userId: data.userId,
         amount: data.amount,
         method: data.method,
-        mobileMoneyNumber: data.mobileMoneyNumber,
+        : data
         transactionId: data.transactionId,
         status: data.status || 'PENDING',
       },
     });
   }
 
-  async findByRideId(rideId: string) {
+  async findByid(id: string) {
     return prisma.payment.findUnique({
-      where: { rideId },
-      include: { ride: true, user: true },
+      where: { id },
+      include: { ride: true,  },
     });
   }
 

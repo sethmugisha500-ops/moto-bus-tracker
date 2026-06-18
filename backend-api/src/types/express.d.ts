@@ -1,4 +1,4 @@
-import { User } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 declare global {
   namespace Express {
@@ -6,11 +6,10 @@ declare global {
       user?: {
         id: string;
         phone: string;
-        fullName: string;
         role: string;
+        // add other fields you need
       };
+      userId?: string;
     }
   }
 }
-
-export {};

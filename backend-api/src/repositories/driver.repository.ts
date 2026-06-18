@@ -6,16 +6,16 @@ export class DriverRepository {
       data: {
         userId,
         licenseNumber: data.licenseNumber,
-        experienceYears: data.experienceYears || 0,
+        totalTrips: data.totalTrips || 0,
       },
-      include: { user: true, vehicle: true },
+      include: {   },
     });
   }
 
   async findByUserId(userId: string) {
     return prisma.driver.findUnique({
       where: { userId },
-      include: { user: true, vehicle: true },
+      include: {   },
     });
   }
 
@@ -26,7 +26,7 @@ export class DriverRepository {
         currentLat: lat,
         currentLng: lng,
         isOnline,
-        isAvailable: isOnline,
+        isOnline: isOnline,
       },
     });
   }
@@ -36,13 +36,13 @@ export class DriverRepository {
     return prisma.driver.findMany({
       where: {
         isOnline: true,
-        isAvailable: true,
+        isOnline: true,
         currentLat: { gte: lat - 0.05, lte: lat + 0.05 },
         currentLng: { gte: lng - 0.05, lte: lng + 0.05 },
       },
       include: {
-        user: true,
-        vehicle: true,
+        
+        
       },
       take: 20,
     });
@@ -53,7 +53,7 @@ export class DriverRepository {
       where: { id: driverId },
       data: {
         totalEarnings: { increment: amount },
-        totalRides: { increment: 1 },
+        totalTrips: { increment: 1 },
       },
     });
   }

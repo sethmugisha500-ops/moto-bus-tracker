@@ -22,20 +22,20 @@ export class DriverController {
           currentLat: lat,
           currentLng: lng,
           isOnline: isOnline !== undefined ? isOnline : driver.isOnline,
-          isAvailable: isOnline !== undefined ? isOnline : driver.isAvailable,
+          isOnline: isOnline !== undefined ? isOnline : driver.isOnline,
         },
       });
 
       // Save to driver location history
       await prisma.driverLocation.upsert({
-        where: { driverId: driver.id },
-        update: { lat, lng, isActive: isOnline !== undefined ? isOnline : true, updatedAt: new Date() },
-        create: { driverId: driver.id, lat, lng, isActive: true },
+        where: {  },
+        update: { lat, lng, isOnline: isOnline !== undefined ? isOnline : true, updatedAt: new Date() },
+        create: {  lat, lng, isOnline: true },
       });
 
-      res.json({ success: true, message: 'Location updated' });
+      return res.json({ success: true, message: 'Location updated' });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -57,15 +57,15 @@ export class DriverController {
           pickupLng: { gte: driver.currentLng - 0.05, lte: driver.currentLng + 0.05 },
         },
         include: {
-          rider: { include: { user: true } },
+          rider: true,
         },
         orderBy: { createdAt: 'asc' },
         take: 10,
       });
 
-      res.json({ success: true, rides });
+      return res.json({ success: true, rides });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -74,18 +74,18 @@ export class DriverController {
       const userId = req.user!.id;
       const driver = await prisma.driver.findUnique({
         where: { userId },
-        include: { vehicle: true },
+        include: {  },
       });
 
       if (!driver) {
         return res.status(404).json({ success: false, message: 'Driver not found' });
       }
 
-      res.json({
+      return res.json({
         success: true,
         stats: {
           rating: driver.rating,
-          totalRides: driver.totalRides,
+          totalTrips: driver.totalTrips,
           totalEarnings: driver.totalEarnings,
           isOnline: driver.isOnline,
           isApproved: driver.isApproved,
@@ -93,7 +93,7 @@ export class DriverController {
         },
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 }

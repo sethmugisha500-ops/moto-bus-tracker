@@ -107,7 +107,7 @@ app.use((req, res, next) => {
 
 // Health check - Important for Render
 app.get('/health', (req, res) => {
-  res.json({
+  return res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
@@ -119,7 +119,7 @@ app.get('/health', (req, res) => {
 
 // API Version
 app.get('/api/version', (req, res) => {
-  res.json({
+  return res.json({
     version: '1.0.0',
     environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
@@ -159,7 +159,7 @@ app.use('/api/admin', require('./routes/admin').default);
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({
+  return res.status(404).json({
     success: false,
     message: `Route ${req.method} ${req.path} not found`,
   });
@@ -168,7 +168,7 @@ app.use((req, res) => {
 // Error handler
 app.use((err: any, req: any, res: any, next: any) => {
   console.error('❌ Error:', err);
-  res.status(err.status || 500).json({
+  return res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal Server Error',
   });

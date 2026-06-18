@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 const router = Router();
 
-// Send OTP
+// Send otp
 router.post('/send-otp', (req, res) => {
   const { phone } = req.body;
   console.log('Received phone:', phone);
@@ -12,26 +12,26 @@ router.post('/send-otp', (req, res) => {
   }
   
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  console.log(`📱 OTP for ${phone}: ${otp}`);
+  console.log(`📱 otp for ${phone}: ${otp}`);
   
-  res.json({
+  return res.json({
     success: true,
-    message: 'OTP sent successfully',
-    devOtp: otp,
+    message: 'otp sent successfully',
+    devotp: otp,
   });
 });
-// Verify OTP
+// Verify otp
 router.post('/verify-otp', (req, res) => {
   const { phone, otp } = req.body;
   
   if (!phone || !otp) {
-    return res.status(400).json({ success: false, message: 'Phone and OTP required' });
+    return res.status(400).json({ success: false, message: 'Phone and otp required' });
   }
   
   if (otp.length === 6) {
     const token = Buffer.from(JSON.stringify({ userId: Date.now(), phone })).toString('base64');
     
-    res.json({
+    return res.json({
       success: true,
       token,
       user: {
@@ -42,7 +42,7 @@ router.post('/verify-otp', (req, res) => {
       },
     });
   } else {
-    res.status(400).json({ success: false, message: 'Invalid OTP' });
+    return res.status(400).json({ success: false, message: 'Invalid otp' });
   }
 });
 

@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import prisma from '../../config/database';
-import { io } from '../../socket/socket.server';
+// import { io } from '../../socket/socket.server';
 
 export class RidesController {
   async createRide(req: AuthRequest, res: Response) {
@@ -21,7 +21,7 @@ export class RidesController {
 
       const ride = await prisma.ride.create({
         data: {
-          riderId: req.user.id,
+          riderId: req.user?.id,
           pickupLat,
           pickupLng,
           pickupAddress,
@@ -51,9 +51,9 @@ export class RidesController {
 
   async acceptRide(req: AuthRequest, res: Response) {
     try {
-      const { rideId } = req.params;
+      const { id } = req.params;
       const driver = await prisma.driver.findUnique({
-        where: { userId: req.user.id },
+        where: { userId: req.user?.id },
       });
 
       if (!driver) {
@@ -61,15 +61,15 @@ export class RidesController {
       }
 
       const ride = await prisma.ride.update({
-        where: { id: rideId, status: 'PENDING' },
+        where: { id: id, status: 'PENDING' },
         data: {
-          driverId: driver.id,
+          
           status: 'ACCEPTED',
         },
         include: {
           rider: true,
           driver: {
-            include: { user: true, vehicle: true },
+            include: {   },
           },
         },
       });
@@ -89,11 +89,11 @@ export class RidesController {
 
   async startRide(req: AuthRequest, res: Response) {
     try {
-      const { rideId } = req.params;
+      const { id } = req.params;
       const ride = await prisma.ride.update({
-        where: { id: rideId, status: 'ACCEPTED' },
+        where: { id: id, status: 'ACCEPTED' },
         data: {
-          status: 'IN_PROGRESS',
+          status: 'STARTED',
           startedAt: new Date(),
         },
       });
@@ -108,9 +108,9 @@ export class RidesController {
 
   async completeRide(req: AuthRequest, res: Response) {
     try {
-      const { rideId } = req.params;
+      const { id } = req.params;
       const ride = await prisma.ride.update({
-        where: { id: rideId, status: 'IN_PROGRESS' },
+        where: { id: id, status: 'STARTED' },
         data: {
           status: 'COMPLETED',
           completedAt: new Date(),
@@ -127,7 +127,7 @@ export class RidesController {
           where: { id: ride.driverId },
           data: {
             totalEarnings: { increment: ride.fare * 0.8 }, // 80% to driver
-            totalRides: { increment: 1 },
+            totalTrips: { increment: 1 },
           },
         });
       }
@@ -142,19 +142,19 @@ export class RidesController {
 
   async cancelRide(req: AuthRequest, res: Response) {
     try {
-      const { rideId } = req.params;
+      const { id } = req.params;
       const { reason } = req.body;
 
       const ride = await prisma.ride.update({
-        where: { id: rideId, status: { in: ['PENDING', 'ACCEPTED'] } },
+        where: { id: id, status: { in: ['PENDING', 'ACCEPTED'] } },
         data: {
           status: 'CANCELLED',
           cancelledAt: new Date(),
-          cancellationReason: reason,
+          cancelledAt: reason,
         },
       });
 
-      io.to(`ride_${rideId}`).emit('ride_cancelled', { rideId, reason });
+      io.to(`ride_${id}`).emit('ride_cancelled', { id, reason });
 
       return res.json(ride);
     } catch (error) {
@@ -164,13 +164,13 @@ export class RidesController {
 
   async getRideById(req: AuthRequest, res: Response) {
     try {
-      const { rideId } = req.params;
+      const { id } = req.params;
       const ride = await prisma.ride.findUnique({
-        where: { id: rideId },
+        where: { id: id },
         include: {
           rider: true,
           driver: {
-            include: { user: true, vehicle: true },
+            include: {   },
           },
           tracking: {
             orderBy: { timestamp: 'desc' },
@@ -194,11 +194,11 @@ export class RidesController {
   async getUserRides(req: AuthRequest, res: Response) {
     try {
       const rides = await prisma.ride.findMany({
-        where: { riderId: req.user.id },
+        where: { riderId: req.user?.id },
         orderBy: { createdAt: 'desc' },
         include: {
           driver: {
-            include: { user: true },
+            include: {  },
           },
           rating: true,
         },
@@ -213,18 +213,18 @@ export class RidesController {
   private async notifyNearbyDrivers(ride: any) {
     // Find nearby drivers within 2km radius
     const nearbyDrivers = await prisma.$queryRaw`
-      SELECT d.*, u.fullName, u.phone 
+      SELECT d.*, u.name, u.phone 
       FROM "Driver" d
       JOIN "User" u ON d."userId" = u.id
       WHERE d."isOnline" = true 
-      AND d."isAvailable" = true
+      AND d."isOnline" = true
       AND d."currentLat" IS NOT NULL
       AND (6371 * acos(cos(radians(${ride.pickupLat})) * cos(radians(d."currentLat")) * cos(radians(d."currentLng") - radians(${ride.pickupLng})) + sin(radians(${ride.pickupLat})) * sin(radians(d."currentLat")))) <= 2
     `;
 
     for (const driver of nearbyDrivers as any[]) {
       io.to(`driver_${driver.userId}`).emit('new_ride_request', {
-        rideId: ride.id,
+        id: ride.id,
         pickupLat: ride.pickupLat,
         pickupLng: ride.pickupLng,
         pickupAddress: ride.pickupAddress,
@@ -246,7 +246,7 @@ export class RidesController {
         }),
         prisma.payment.create({
           data: {
-            rideId: ride.id,
+            id: ride.id,
             userId: ride.riderId,
             amount: ride.fare,
             method: 'WALLET',

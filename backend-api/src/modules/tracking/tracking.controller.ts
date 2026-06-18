@@ -2,14 +2,14 @@ import { Response } from 'express';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import prisma from '../../config/database';
 import redisClient from '../../config/redis';
-import { io } from '../../socket/socket.server';
+// import { io } from '../../socket/socket.server';
 
 export class TrackingController {
   async updateLocation(req: AuthRequest, res: Response) {
     try {
-      const { lat, lng, heading, speed, rideId } = req.body;
+      const { lat, lng, heading, speed, id } = req.body;
       const driver = await prisma.driver.findUnique({
-        where: { userId: req.user.id },
+        where: { userId: req.user?.id },
       });
 
       if (!driver) {
@@ -23,18 +23,18 @@ export class TrackingController {
       });
 
       // Store location in Redis for real-time access
-      await redisClient.setEx(
+      await redisClient.setex(
         `driver_location:${driver.id}`,
         30,
         JSON.stringify({ lat, lng, heading, speed, timestamp: Date.now() })
       );
 
       // Store tracking data for active ride
-      if (rideId) {
+      if (id) {
         await prisma.trackingData.create({
           data: {
-            rideId,
-            driverId: driver.id,
+            id,
+            
             lat,
             lng,
             speed,
@@ -44,13 +44,13 @@ export class TrackingController {
 
         // Emit real-time location to rider
         const ride = await prisma.ride.findUnique({
-          where: { id: rideId },
+          where: { id: id },
           select: { riderId: true },
         });
 
         if (ride) {
           io.to(`user_${ride.riderId}`).emit('driver_location_update', {
-            rideId,
+            id,
             lat,
             lng,
             heading,
@@ -61,13 +61,13 @@ export class TrackingController {
 
       // Emit to admin dashboard for fleet monitoring
       io.to('admin_dashboard').emit('fleet_update', {
-        driverId: driver.id,
-        driverName: req.user.fullName,
+        
+        driverName: req.user?.name,
         lat,
         lng,
         heading,
         status: driver.isOnline ? 'ONLINE' : 'OFFLINE',
-        rideId: rideId || null,
+        id: id || null,
       });
 
       return res.json({ success: true });
@@ -104,7 +104,7 @@ export class TrackingController {
       const nearbyDrivers = await prisma.$queryRaw`
         SELECT 
           d.*,
-          u."fullName",
+          u."name",
           u."profileImage",
           v."plateNumber",
           v."model",
@@ -114,7 +114,7 @@ export class TrackingController {
         JOIN "User" u ON d."userId" = u.id
         LEFT JOIN "Vehicle" v ON d."vehicleId" = v.id
         WHERE d."isOnline" = true 
-        AND d."isAvailable" = true
+        AND d."isOnline" = true
         AND d."currentLat" IS NOT NULL
         HAVING distance <= ${parseFloat(radius as string)}
         ORDER BY distance ASC
@@ -129,9 +129,9 @@ export class TrackingController {
 
   async startTracking(req: AuthRequest, res: Response) {
     try {
-      const { rideId } = req.params;
+      const { id } = req.params;
       const ride = await prisma.ride.findUnique({
-        where: { id: rideId },
+        where: { id: id },
         include: { driver: true },
       });
 
@@ -148,7 +148,7 @@ export class TrackingController {
       }, 3000);
 
       // Store interval ID for cleanup
-      await redisClient.setEx(`tracking_ride:${rideId}`, 3600, interval.id);
+      await redisClient.setex(`tracking_ride:${id}`, 3600, interval);
 
       return res.json({ success: true, message: 'Tracking started' });
     } catch (error) {
@@ -158,12 +158,12 @@ export class TrackingController {
 
   async stopTracking(req: AuthRequest, res: Response) {
     try {
-      const { rideId } = req.params;
-      const intervalId = await redisClient.get(`tracking_ride:${rideId}`);
+      const { id } = req.params;
+      const intervalId = await redisClient.get(`tracking_ride:${id}`);
 
       if (intervalId) {
         clearInterval(parseInt(intervalId));
-        await redisClient.del(`tracking_ride:${rideId}`);
+        await redisClient.del(`tracking_ride:${id}`);
       }
 
       return res.json({ success: true, message: 'Tracking stopped' });

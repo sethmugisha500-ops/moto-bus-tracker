@@ -17,9 +17,9 @@ export class SMSService {
     }
   }
 
-  async sendOTP(phoneNumber: string, otp: string): Promise<boolean> {
+  async sendotp(phoneNumber: string, otp: string): Promise<boolean> {
     if (!this.isConfigured) {
-      console.log(`[SMS Mock] OTP for ${phoneNumber}: ${otp}`);
+      console.log(`[SMS Mock] otp for ${phoneNumber}: ${otp}`);
       return true;
     }
 
@@ -103,14 +103,14 @@ export class SMSService {
     driverName?: string;
     vehicleNumber?: string;
     location: string;
-    rideId: string;
+    id: string;
   }): Promise<boolean> {
     if (!this.isConfigured) {
       console.log(`[SMS Mock] SOS to ${emergencyContact}:`, data);
       return true;
     }
 
-    const message = `🚨 SOS ALERT 🚨\n\nUser: ${data.userName}\nDriver: ${data.driverName || 'Unknown'}\nVehicle: ${data.vehicleNumber || 'N/A'}\nLocation: ${data.location}\nRide ID: ${data.rideId}\n\nPlease check on them immediately.`;
+    const message = `🚨 SOS ALERT 🚨\n\nUser: ${data.userName}\nDriver: ${data.driverName || 'Unknown'}\nVehicle: ${data.vehicleNumber || 'N/A'}\nLocation: ${data.location}\nRide ID: ${data.id}\n\nPlease check on them immediately.`;
     
     try {
       await this.client.messages.create({

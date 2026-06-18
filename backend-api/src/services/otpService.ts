@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+﻿import { PrismaClient } from '@prisma/client';
 import redis from '../config/redis';
 import twilio from 'twilio';
 import nodemailer from 'nodemailer';
@@ -9,22 +9,18 @@ const prisma = new PrismaClient();
 export class OTPService {
   private twilioClient: any;
   private emailTransporter: any;
-  private readonly OTP_EXPIRY = 300; // 5 minutes in seconds
+  private readonly OTP_EXPIRY = 300;
   private readonly MAX_ATTEMPTS = 5;
-  private readonly RATE_LIMIT_WINDOW = 60; // 1 minute in seconds
+  private readonly RATE_LIMIT_WINDOW = 60;
   private readonly MAX_OTP_PER_WINDOW = 3;
 
   constructor() {
-    // Initialize Twilio for SMS
     if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
       this.twilioClient = twilio(
         process.env.TWILIO_ACCOUNT_SID,
         process.env.TWILIO_AUTH_TOKEN
       );
-      console.log('📱 Twilio SMS service initialized');
     }
-
-    // Initialize email transporter
     if (process.env.SMTP_HOST) {
       this.emailTransporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
@@ -35,10 +31,7 @@ export class OTPService {
           pass: process.env.SMTP_PASS,
         },
       });
-      console.log('📧 Email service initialized');
     }
-
-    // Cleanup expired OTPs periodically
     setInterval(() => this.cleanupExpiredOTPs(), 10 * 60 * 1000);
   }
 
@@ -46,7 +39,6 @@ export class OTPService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  // Generate OTP with specific pattern (for different use cases)
   generateOTPWithPattern(pattern: 'numeric' | 'alphanumeric' | 'secure' = 'numeric'): string {
     switch (pattern) {
       case 'alphanumeric':
@@ -62,17 +54,14 @@ export class OTPService {
     const otp = this.generateOTP();
     const expiresAt = new Date(Date.now() + this.OTP_EXPIRY * 1000);
 
-    // Check rate limiting using Redis
-    const rateLimitKey = `otp:ratelimit:${phone}`;
+    const rateLimitKey = otp:ratelimit:;
     const currentCount = await redis.get(rateLimitKey);
-    
     if (currentCount && parseInt(currentCount) >= this.MAX_OTP_PER_WINDOW) {
       const ttl = await redis.ttl(rateLimitKey);
-      throw new Error(`Rate limit exceeded. Please wait ${ttl} seconds.`);
+      throw new Error(Rate limit exceeded. Please wait  seconds.);
     }
 
-    // Store OTP in Redis for fast access
-    const redisKey = `otp:${phone}`;
+    const redisKey = otp:;
     await redis.setex(redisKey, this.OTP_EXPIRY, JSON.stringify({
       otp,
       phone,
@@ -83,9 +72,7 @@ export class OTPService {
       attempts: 0,
     }));
 
-    // Also store in database for persistence
     try {
-      // FIX: Use 'otp' (lowercase) instead of 'oTP'
       await prisma.otp.create({
         data: {
           phone,
@@ -93,65 +80,48 @@ export class OTPService {
           otp,
           expiresAt,
           userId: userId || null,
-          // Remove 'type' if it doesn't exist in your schema
-          // type, // Uncomment only if you add this field to the Otp model
         },
       });
-      console.log(`💾 OTP stored in database for ${phone}`);
     } catch (error) {
-      console.error('❌ Failed to store OTP in database:', error);
+      console.error('Failed to store OTP in database:', error);
     }
 
-    // Increment rate limit counter
     await redis.incr(rateLimitKey);
     await redis.expire(rateLimitKey, this.RATE_LIMIT_WINDOW);
 
-    // Delivery results
-    const results = {
-      sms: false,
-      email: false,
-      fallback: false,
-    };
+    const results = { sms: false, email: false, fallback: false };
 
-    // Try SMS via Twilio
     if (this.twilioClient) {
       try {
-        const message = await this.twilioClient.messages.create({
-          body: `Your Moto-Bus verification code is: ${otp}\n\nThis code expires in 5 minutes.`,
+        await this.twilioClient.messages.create({
+          body: Your Moto-Bus verification code is: \n\nThis code expires in 5 minutes.,
           from: process.env.TWILIO_PHONE_NUMBER,
           to: phone,
         });
         results.sms = true;
-        console.log(`✅ SMS OTP sent to ${phone} (SID: ${message.sid})`);
       } catch (error: any) {
-        console.error('❌ SMS delivery failed:', error.message);
-        if (error.code === 21608) {
-          console.error('⚠️  Twilio error: Unverified phone number. Add to verified callers.');
-        }
+        console.error('SMS delivery failed:', error.message);
       }
     }
 
-    // Try Email
     if (this.emailTransporter && email) {
       try {
         await this.emailTransporter.sendMail({
           from: process.env.SMTP_FROM_EMAIL || 'noreply@motobustracker.com',
           to: email,
-          subject: '🔐 Moto-Bus Verification Code',
+          subject: 'Moto-Bus Verification Code',
           html: this.getEmailTemplate(otp, type),
-          text: `Your Moto-Bus verification code is: ${otp}\n\nThis code expires in 5 minutes.`,
+          text: Your Moto-Bus verification code is: \n\nThis code expires in 5 minutes.,
         });
         results.email = true;
-        console.log(`✅ Email OTP sent to ${email}`);
       } catch (error: any) {
-        console.error('❌ Email delivery failed:', error.message);
+        console.error('Email delivery failed:', error.message);
       }
     }
 
-    // Fallback for development
     if (!results.sms && !results.email) {
       results.fallback = true;
-      console.log(`🔧 Fallback OTP for ${phone}: ${otp}`);
+      console.log(Fallback OTP for : );
     }
 
     return {
@@ -171,36 +141,29 @@ export class OTPService {
       RESET_PASSWORD: 'Reset your Moto-Bus password',
       TWO_FACTOR: 'Two-factor authentication',
     };
-
     const title = messages[type as keyof typeof messages] || messages.VERIFICATION;
 
-    return `
+    return \
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa;">
         <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
           <div style="text-align: center; margin-bottom: 20px;">
-            <h2 style="color: #2563eb; margin: 0;">🚐 Moto-Bus</h2>
+            <h2 style="color: #2563eb; margin: 0;">Moto-Bus</h2>
             <p style="color: #6b7280; margin: 5px 0;">Safe & Reliable Transport</p>
           </div>
-          
-          <h3 style="color: #1a1a1a; text-align: center;">${title}</h3>
-          
+          <h3 style="color: #1a1a1a; text-align: center;">\</h3>
           <p style="color: #4b5563; font-size: 16px;">Your verification code is:</p>
-          
           <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
-            <h1 style="font-size: 42px; letter-spacing: 10px; color: #1a1a1a; margin: 0;">${otp}</h1>
+            <h1 style="font-size: 42px; letter-spacing: 10px; color: #1a1a1a; margin: 0;">\</h1>
           </div>
-          
           <p style="color: #6b7280; font-size: 14px;">This code expires in <strong>5 minutes</strong>.</p>
-          
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-          
           <p style="color: #9ca3af; font-size: 12px; text-align: center;">
             If you didn't request this code, please ignore this email.<br>
             For security, never share this code with anyone.
           </p>
         </div>
       </div>
-    `;
+    \;
   }
 
   getDeliveryMethod(results: any): string {
@@ -209,37 +172,16 @@ export class OTPService {
     return 'fallback';
   }
 
-  async verifyOTP(identifier: string, otp: string): Promise<{ 
-    valid: boolean; 
-    message: string; 
-    userId?: string;
-    type?: string;
-  }> {
-    console.log(`🔐 Verifying OTP for ${identifier}`);
-
-    // Check Redis cache first (fastest)
-    const redisKey = `otp:${identifier}`;
+  async verifyOTP(identifier: string, otp: string): Promise<{ valid: boolean; message: string; userId?: string }> {
+    const redisKey = otp:;
     const cachedData = await redis.get(redisKey);
-    
     if (cachedData) {
       const data = JSON.parse(cachedData);
-      
       if (data.otp === otp) {
-        // OTP matched in cache
         await redis.del(redisKey);
-        console.log(`✅ OTP verified from cache for ${identifier}`);
-        
-        // Mark as used in database
         const user = await this.markOTPAsUsed(identifier, otp);
-        return {
-          valid: true,
-          message: 'OTP verified successfully',
-          userId: user?.id || data.userId,
-          type: data.type,
-        };
+        return { valid: true, message: 'OTP verified successfully', userId: user?.id || data.userId };
       }
-      
-      // Increment attempts in cache
       data.attempts = (data.attempts || 0) + 1;
       if (data.attempts >= this.MAX_ATTEMPTS) {
         await redis.del(redisKey);
@@ -248,161 +190,93 @@ export class OTPService {
       await redis.setex(redisKey, this.OTP_EXPIRY, JSON.stringify(data));
     }
 
-    // Check database
     try {
-      // FIX: Use 'otp' (lowercase) instead of 'oTP'
       const otpRecord = await prisma.otp.findFirst({
         where: {
-          OR: [
-            { phone: identifier },
-            { email: identifier },
-          ],
+          OR: [{ phone: identifier }, { email: identifier }],
           otp,
           isUsed: false,
-          expiresAt: {
-            gt: new Date(),
-          },
+          expiresAt: { gt: new Date() },
         },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        include: {
-          user: true,
-        },
+        orderBy: { createdAt: 'desc' },
+        include: { user: true },
       });
 
       if (otpRecord) {
-        // Check if user exists
         let user = otpRecord.user;
-        
         if (!user) {
           user = await prisma.user.findFirst({
-            where: {
-              OR: [
-                { phone: identifier },
-                { email: identifier },
-              ],
-            },
+            where: { OR: [{ phone: identifier }, { email: identifier }] },
           });
         }
-
-        // Update OTP as used
         await prisma.otp.update({
           where: { id: otpRecord.id },
-          data: {
-            attempts: { increment: 1 },
-            isUsed: true,
-            userId: user?.id || null,
-          },
+          data: { attempts: { increment: 1 }, isUsed: true, userId: user?.id || null },
         });
-
-        // Update user verification status if user exists and type is VERIFICATION
-        if (user && otpRecord.type === 'VERIFICATION') {
+        if (user) {
           await prisma.user.update({
             where: { id: user.id },
             data: { isVerified: true },
           });
-          console.log(`✅ User ${user.id} verified`);
         }
-
-        // Remove from Redis cache
-        await redis.del(`otp:${identifier}`);
-        
-        return {
-          valid: true,
-          message: 'OTP verified successfully',
-          userId: user?.id || otpRecord.userId || undefined,
-          type: otpRecord.type || undefined,
-        };
+        await redis.del(otp:);
+        return { valid: true, message: 'OTP verified successfully', userId: user?.id || otpRecord.userId || undefined };
       }
 
-      // Check for expired or invalid OTP
-      // FIX: Use 'otp' (lowercase) instead of 'oTP'
       const expiredOTP = await prisma.otp.findFirst({
         where: {
-          OR: [
-            { phone: identifier },
-            { email: identifier },
-          ],
+          OR: [{ phone: identifier }, { email: identifier }],
           otp,
           isUsed: false,
         },
       });
-
       if (expiredOTP) {
-        // Increment attempts
         await prisma.otp.update({
           where: { id: expiredOTP.id },
           data: { attempts: { increment: 1 } },
         });
-
         if (expiredOTP.expiresAt < new Date()) {
-          console.log(`⏰ OTP expired for ${identifier}`);
           return { valid: false, message: 'OTP has expired' };
         }
-
         if (expiredOTP.attempts >= this.MAX_ATTEMPTS) {
-          console.log(`🔒 Too many attempts for ${identifier}`);
           return { valid: false, message: 'Too many failed attempts. Please request a new OTP.' };
         }
-
-        console.log(`❌ Invalid OTP for ${identifier} (attempt ${expiredOTP.attempts + 1})`);
         return { valid: false, message: 'Invalid OTP' };
       }
-
-      console.log(`❌ OTP not found for ${identifier}`);
       return { valid: false, message: 'OTP not found. Please request a new code.' };
     } catch (error) {
-      console.error('❌ OTP verification error:', error);
+      console.error('OTP verification error:', error);
       return { valid: false, message: 'Verification failed. Please try again.' };
     }
   }
 
   async markOTPAsUsed(identifier: string, otp: string) {
     try {
-      // FIX: Use 'otp' (lowercase) instead of 'oTP'
       const updated = await prisma.otp.updateMany({
         where: {
-          OR: [
-            { phone: identifier },
-            { email: identifier },
-          ],
+          OR: [{ phone: identifier }, { email: identifier }],
           otp,
           isUsed: false,
         },
         data: { isUsed: true },
       });
-
       if (updated.count > 0) {
-        const user = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { phone: identifier },
-              { email: identifier },
-            ],
-          },
+        return prisma.user.findFirst({
+          where: { OR: [{ phone: identifier }, { email: identifier }] },
         });
-        return user;
       }
       return null;
     } catch (error) {
-      console.error('❌ Failed to mark OTP as used:', error);
+      console.error('Failed to mark OTP as used:', error);
       return null;
     }
   }
 
   async cleanupExpiredOTPs() {
     try {
-      // Clean database - FIX: Use 'otp' (lowercase)
       const dbResult = await prisma.otp.deleteMany({
-        where: {
-          expiresAt: {
-            lt: new Date(),
-          },
-        },
+        where: { expiresAt: { lt: new Date() } },
       });
-
-      // Clean Redis cache (scan and delete expired OTPs)
       const keys = await redis.keys('otp:*');
       let redisCount = 0;
       for (const key of keys) {
@@ -415,45 +289,31 @@ export class OTPService {
           }
         }
       }
-
       if (dbResult.count > 0 || redisCount > 0) {
-        console.log(`🧹 Cleaned up ${dbResult.count} DB and ${redisCount} Redis OTPs`);
+        console.log(Cleaned up  DB and  Redis OTPs);
       }
     } catch (error) {
-      console.error('❌ Failed to cleanup expired OTPs:', error);
+      console.error('Failed to cleanup expired OTPs:', error);
     }
   }
 
-  // Development helper - get OTP from cache
   async getDevOTP(phone: string): Promise<string | null> {
-    const redisKey = `otp:${phone}`;
+    const redisKey = otp:;
     const data = await redis.get(redisKey);
     if (data) {
       const parsed = JSON.parse(data);
       return parsed.otp;
     }
-    
-    // Fallback to database - FIX: Use 'otp' (lowercase)
     const record = await prisma.otp.findFirst({
-      where: {
-        phone,
-        isUsed: false,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
+      where: { phone, isUsed: false, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
     });
-    
     return record?.otp || null;
   }
 
-  // Get active OTPs for a phone number
   async getActiveOTPs(phone: string) {
-    // Check Redis first
-    const redisKey = `otp:${phone}`;
+    const redisKey = otp:;
     const data = await redis.get(redisKey);
-    
     if (data) {
       const parsed = JSON.parse(data);
       return [{
@@ -465,100 +325,52 @@ export class OTPService {
         source: 'redis',
       }];
     }
-
-    // Fallback to database - FIX: Use 'otp' (lowercase)
     return prisma.otp.findMany({
-      where: {
-        phone,
-        isUsed: false,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      where: { phone, isUsed: false, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
       take: 5,
     });
   }
 
-  // Check if OTP is valid without consuming it
-  async checkOTP(identifier: string, otp: string): Promise<{ 
-    valid: boolean; 
-    remainingSeconds?: number;
-    type?: string;
-  }> {
-    // Check Redis
-    const redisKey = `otp:${identifier}`;
+  async checkOTP(identifier: string, otp: string): Promise<{ valid: boolean; remainingSeconds?: number }> {
+    const redisKey = otp:;
     const data = await redis.get(redisKey);
-    
     if (data) {
       const parsed = JSON.parse(data);
       if (parsed.otp === otp) {
         const remaining = Math.floor((new Date(parsed.expiresAt).getTime() - Date.now()) / 1000);
-        return { valid: true, remainingSeconds: Math.max(0, remaining), type: parsed.type };
+        return { valid: true, remainingSeconds: Math.max(0, remaining) };
       }
       return { valid: false };
     }
-
-    // Check database - FIX: Use 'otp' (lowercase)
     try {
       const record = await prisma.otp.findFirst({
         where: {
-          OR: [
-            { phone: identifier },
-            { email: identifier },
-          ],
+          OR: [{ phone: identifier }, { email: identifier }],
           otp,
           isUsed: false,
-          expiresAt: {
-            gt: new Date(),
-          },
+          expiresAt: { gt: new Date() },
         },
       });
-
       if (record) {
         const remaining = Math.floor((record.expiresAt.getTime() - Date.now()) / 1000);
-        return { 
-          valid: true, 
-          remainingSeconds: Math.max(0, remaining),
-          type: record.type || undefined,
-        };
+        return { valid: true, remainingSeconds: Math.max(0, remaining) };
       }
       return { valid: false };
     } catch (error) {
-      console.error('❌ Check OTP error:', error);
+      console.error('Check OTP error:', error);
       return { valid: false };
     }
   }
 
-  // Generate OTP for specific operations
   async generateOperationOTP(phone: string, operation: string, email?: string) {
     const otp = this.generateOTPWithPattern('secure');
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes for operations
-
-    // Store in Redis with operation-specific key
-    const redisKey = `otp:operation:${operation}:${phone}`;
-    await redis.setex(redisKey, 600, JSON.stringify({
-      otp,
-      phone,
-      email,
-      operation,
-      expiresAt: expiresAt.toISOString(),
-    }));
-
-    // Store in database - FIX: Use 'otp' (lowercase)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const redisKey = otp:operation::;
+    await redis.setex(redisKey, 600, JSON.stringify({ otp, phone, email, operation, expiresAt: expiresAt.toISOString() }));
     await prisma.otp.create({
-      data: {
-        phone,
-        email: email || null,
-        otp,
-        expiresAt,
-        // Remove 'type' if not in schema
-        // type: operation,
-      },
+      data: { phone, email: email || null, otp, expiresAt },
     });
-
     return { otp, expiresAt };
   }
 }

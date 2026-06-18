@@ -54,14 +54,14 @@ export class OTPService {
     const otp = this.generateOTP();
     const expiresAt = new Date(Date.now() + this.OTP_EXPIRY * 1000);
 
-    const rateLimitKey = otp:ratelimit:;
+    const rateLimitKey = `otp:ratelimit:${phone}`;
     const currentCount = await redis.get(rateLimitKey);
     if (currentCount && parseInt(currentCount) >= this.MAX_OTP_PER_WINDOW) {
       const ttl = await redis.ttl(rateLimitKey);
-      throw new Error(Rate limit exceeded. Please wait  seconds.);
+      throw new Error(`Rate limit exceeded. Please wait ${ttl} seconds.`);
     }
 
-    const redisKey = otp:;
+    const redisKey = `otp:${phone}`;
     await redis.setex(redisKey, this.OTP_EXPIRY, JSON.stringify({
       otp,
       phone,
@@ -94,7 +94,7 @@ export class OTPService {
     if (this.twilioClient) {
       try {
         await this.twilioClient.messages.create({
-          body: Your Moto-Bus verification code is: \n\nThis code expires in 5 minutes.,
+          body: `Your Moto-Bus verification code is: ${otp}\n\nThis code expires in 5 minutes.`,
           from: process.env.TWILIO_PHONE_NUMBER,
           to: phone,
         });
@@ -111,7 +111,7 @@ export class OTPService {
           to: email,
           subject: 'Moto-Bus Verification Code',
           html: this.getEmailTemplate(otp, type),
-          text: Your Moto-Bus verification code is: \n\nThis code expires in 5 minutes.,
+          text: `Your Moto-Bus verification code is: ${otp}\n\nThis code expires in 5 minutes.`,
         });
         results.email = true;
       } catch (error: any) {
@@ -121,7 +121,7 @@ export class OTPService {
 
     if (!results.sms && !results.email) {
       results.fallback = true;
-      console.log(Fallback OTP for : );
+      console.log(`Fallback OTP for ${phone}: ${otp}`);
     }
 
     return {
@@ -143,17 +143,17 @@ export class OTPService {
     };
     const title = messages[type as keyof typeof messages] || messages.VERIFICATION;
 
-    return \
+    return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa;">
         <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
           <div style="text-align: center; margin-bottom: 20px;">
             <h2 style="color: #2563eb; margin: 0;">Moto-Bus</h2>
             <p style="color: #6b7280; margin: 5px 0;">Safe & Reliable Transport</p>
           </div>
-          <h3 style="color: #1a1a1a; text-align: center;">\</h3>
+          <h3 style="color: #1a1a1a; text-align: center;">${title}</h3>
           <p style="color: #4b5563; font-size: 16px;">Your verification code is:</p>
           <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
-            <h1 style="font-size: 42px; letter-spacing: 10px; color: #1a1a1a; margin: 0;">\</h1>
+            <h1 style="font-size: 42px; letter-spacing: 10px; color: #1a1a1a; margin: 0;">${otp}</h1>
           </div>
           <p style="color: #6b7280; font-size: 14px;">This code expires in <strong>5 minutes</strong>.</p>
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
@@ -163,7 +163,7 @@ export class OTPService {
           </p>
         </div>
       </div>
-    \;
+    `;
   }
 
   getDeliveryMethod(results: any): string {
@@ -173,7 +173,7 @@ export class OTPService {
   }
 
   async verifyOTP(identifier: string, otp: string): Promise<{ valid: boolean; message: string; userId?: string }> {
-    const redisKey = otp:;
+    const redisKey = `otp:${identifier}`;
     const cachedData = await redis.get(redisKey);
     if (cachedData) {
       const data = JSON.parse(cachedData);
@@ -219,7 +219,7 @@ export class OTPService {
             data: { isVerified: true },
           });
         }
-        await redis.del(otp:);
+        await redis.del(`otp:${identifier}`);
         return { valid: true, message: 'OTP verified successfully', userId: user?.id || otpRecord.userId || undefined };
       }
 
@@ -290,7 +290,7 @@ export class OTPService {
         }
       }
       if (dbResult.count > 0 || redisCount > 0) {
-        console.log(Cleaned up  DB and  Redis OTPs);
+        console.log(`Cleaned up ${dbResult.count} DB and ${redisCount} Redis OTPs`);
       }
     } catch (error) {
       console.error('Failed to cleanup expired OTPs:', error);
@@ -298,7 +298,7 @@ export class OTPService {
   }
 
   async getDevOTP(phone: string): Promise<string | null> {
-    const redisKey = otp:;
+    const redisKey = `otp:${phone}`;
     const data = await redis.get(redisKey);
     if (data) {
       const parsed = JSON.parse(data);
@@ -312,7 +312,7 @@ export class OTPService {
   }
 
   async getActiveOTPs(phone: string) {
-    const redisKey = otp:;
+    const redisKey = `otp:${phone}`;
     const data = await redis.get(redisKey);
     if (data) {
       const parsed = JSON.parse(data);
@@ -333,7 +333,7 @@ export class OTPService {
   }
 
   async checkOTP(identifier: string, otp: string): Promise<{ valid: boolean; remainingSeconds?: number }> {
-    const redisKey = otp:;
+    const redisKey = `otp:${identifier}`;
     const data = await redis.get(redisKey);
     if (data) {
       const parsed = JSON.parse(data);
@@ -366,7 +366,7 @@ export class OTPService {
   async generateOperationOTP(phone: string, operation: string, email?: string) {
     const otp = this.generateOTPWithPattern('secure');
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    const redisKey = otp:operation::;
+    const redisKey = `otp:operation:${operation}:${phone}`;
     await redis.setex(redisKey, 600, JSON.stringify({ otp, phone, email, operation, expiresAt: expiresAt.toISOString() }));
     await prisma.otp.create({
       data: { phone, email: email || null, otp, expiresAt },

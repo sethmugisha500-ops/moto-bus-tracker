@@ -1,345 +1,114 @@
-import { Request, Response } from 'express';
-import authController from './auth.controller';
+﻿import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
+import { prisma } from '../prisma/client';
 
-// Explicitly defined all properties used by your wallet transactions
-interface Transaction {
-  id: string;
-  userId: string;
-  amount: number;
-  description: string;
-  paymentMethod: string;
-  status: 'COMPLETED' | 'PENDING' | 'FAILED';
-  type: 'CREDIT' | 'DEBIT';
-  previousBalance: number;
-  newBalance: number;
-  reference: string;
-  createdAt: Date;
-}
-
-interface AuthRequest extends Request {
-  userId?: string;
-  userRole?: string;
-}
-
-// In-memory storage
-const transactions: Transaction[] = [];
-let nextTransactionId = 1;
-
-class WalletController {
-  // Get wallet balance
-  async getBalance(req: AuthRequest, res: Response): Promise<void> {
+export class WalletController {
+  async getBalance(req: AuthRequest, res: Response) {
     try {
-      const users = authController.getUsers();
-      const user = users.find(u => u.id === req.userId);
-
-      if (!user) {
-        res.status(404).json({
-          success: false,
-          error: 'User not found'
-        });
-        return;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
-      res.json({
-        success: true,
-        data: {
-          balance: user.wallet.balance,
-          currency: user.wallet.currency
-        }
+      const wallet = await prisma.wallet.findUnique({
+        where: { userId }
       });
+
+      return res.json({ success: true, balance: wallet?.balance || 0 });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
+      console.error('Get balance error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to get balance' });
     }
   }
 
-  // Top up wallet
-  async topUp(req: AuthRequest, res: Response): Promise<void> {
+  async topUp(req: AuthRequest, res: Response) {
     try {
-      const { amount, paymentMethod,  } = req.body;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const { amount, paymentMethod } = req.body;
 
       if (!amount || amount <= 0) {
-        res.status(400).json({
-          success: false,
-          error: 'Valid amount is required'
-        });
-        return;
+        return res.status(400).json({ success: false, message: 'Invalid amount' });
       }
 
-      if (!paymentMethod) {
-        res.status(400).json({
-          success: false,
-          error: 'Payment method is required'
-        });
-        return;
-      }
-
-      const users = authController.getUsers();
-      const userIndex = users.findIndex(u => u.id === req.userId);
-
-      if (userIndex === -1) {
-        res.status(404).json({
-          success: false,
-          error: 'User not found'
-        });
-        return;
-      }
-
-      // Process payment validation based on method
-      let paymentSuccess = false;
-      
-      if (paymentMethod === 'MOBILE_MONEY') {
-        // if (!) { // FIXME: Add condition
-          res.status(400).json({
-            success: false,
-            error: 'Mobile money number is required'
-          });
-          return;
-        }
-        paymentSuccess = true;
-      } else if (paymentMethod === 'CARD') {
-        paymentSuccess = true;
-      } else {
-        paymentSuccess = true;
-      }
-
-      if (!paymentSuccess) {
-        res.status(400).json({
-          success: false,
-          error: 'Payment processing failed'
-        });
-        return;
-      }
-
-      // Update wallet balance
-      const previousBalance = users[userIndex].wallet.balance;
-      users[userIndex].wallet.balance += parseFloat(amount);
-      users[userIndex].updatedAt = new Date();
-
-      // Create transaction record
-      const transaction: Transaction = {
-        id: String(nextTransactionId++),
-        userId: req.userId!,
-        amount: parseFloat(amount),
-        description: `Wallet top-up via ${paymentMethod}`,
-        paymentMethod,
-        status: 'COMPLETED',
-        type: 'CREDIT', // Added so stats logic can filter properly
-        previousBalance,
-        newBalance: users[userIndex].wallet.balance,
-        reference: `TXN_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-        createdAt: new Date()
-      };
-      
-      transactions.push(transaction);
-
-      res.json({
-        success: true,
-        message: `Successfully added ${amount} RWF to wallet`,
-        data: {
-          balance: users[userIndex].wallet.balance,
-          transaction
-        }
+      const wallet = await prisma.wallet.update({
+        where: { userId },
+        data: { balance: { increment: amount } }
       });
+
+      return res.json({ success: true, balance: wallet.balance });
     } catch (error) {
       console.error('Top up error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
+      return res.status(500).json({ success: false, message: 'Failed to top up wallet' });
     }
   }
 
-  // Withdraw from wallet
-  async withdraw(req: AuthRequest, res: Response): Promise<void> {
+  async withdraw(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
       const { amount, bankAccount } = req.body;
 
       if (!amount || amount <= 0) {
-        res.status(400).json({
-          success: false,
-          error: 'Valid amount is required'
-        });
-        return;
+        return res.status(400).json({ success: false, message: 'Invalid amount' });
       }
 
-      const users = authController.getUsers();
-      const userIndex = users.findIndex(u => u.id === req.userId);
-
-      if (userIndex === -1) {
-        res.status(404).json({
-          success: false,
-          error: 'User not found'
-        });
-        return;
-      }
-
-      if (users[userIndex].wallet.balance < amount) {
-        res.status(400).json({
-          success: false,
-          error: 'Insufficient balance'
-        });
-        return;
-      }
-
-      const previousBalance = users[userIndex].wallet.balance;
-      users[userIndex].wallet.balance -= parseFloat(amount);
-      users[userIndex].updatedAt = new Date();
-
-      // Create transaction record
-      const transaction: Transaction = {
-        id: String(nextTransactionId++),
-        userId: req.userId!,
-        amount: parseFloat(amount),
-        description: `Withdrawal to ${bankAccount || 'Mobile Money'}`,
-        paymentMethod: 'BANK_TRANSFER',
-        status: 'PENDING',
-        type: 'DEBIT', // Added so stats logic can filter properly
-        previousBalance,
-        newBalance: users[userIndex].wallet.balance,
-        reference: `WDL_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-        createdAt: new Date()
-      };
-      
-      transactions.push(transaction);
-
-      res.json({
-        success: true,
-        message: `Withdrawal request of ${amount} RWF submitted`,
-        data: {
-          balance: users[userIndex].wallet.balance,
-          transaction
-        }
+      const wallet = await prisma.wallet.findUnique({
+        where: { userId }
       });
+
+      if (!wallet || wallet.balance < amount) {
+        return res.status(400).json({ success: false, message: 'Insufficient balance' });
+      }
+
+      const updated = await prisma.wallet.update({
+        where: { userId },
+        data: { balance: { decrement: amount } }
+      });
+
+      return res.json({ success: true, balance: updated.balance });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
+      console.error('Withdraw error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to withdraw' });
     }
   }
 
-  // Get transaction history
-  async getTransactions(req: AuthRequest, res: Response): Promise<void> {
+  async getTransactions(req: AuthRequest, res: Response) {
     try {
-      const limit = parseInt(req.query.limit as string) || 50;
-      const offset = parseInt(req.query.offset as string) || 0;
-      const type = req.query.type as string;
-      
-      let userTransactions = transactions.filter(t => t.userId === req.userId);
-      
-      if (type) {
-        userTransactions = userTransactions.filter(t => t.type === type as 'CREDIT' | 'DEBIT');
-      }
-      
-      userTransactions = userTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      
-      const paginated = userTransactions.slice(offset, offset + limit);
-
-      res.json({
-        success: true,
-        data: {
-          count: userTransactions.length,
-          transactions: paginated,
-          pagination: {
-            limit,
-            offset,
-            hasMore: offset + limit < userTransactions.length
-          }
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
-  }
-
-  // Get transaction by ID
-  async getTransactionById(req: Request, res: Response): Promise<void> {
-    try {
-      const { id } = req.params;
-      const transaction = transactions.find(t => t.id === id);
-
-      if (!transaction) {
-        res.status(404).json({
-          success: false,
-          error: 'Transaction not found'
-        });
-        return;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
-      res.json({
-        success: true,
-        data: { transaction }
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
-  }
+      const { limit = 20, offset = 0 } = req.query;
 
-  // Get wallet statistics
-  async getWalletStats(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      const userTransactions = transactions.filter(t => t.userId === req.userId);
-      
-      const stats = {
-        totalCredited: userTransactions
-          .filter(t => t.type === 'CREDIT' && t.status === 'COMPLETED')
-          .reduce((sum, t) => sum + t.amount, 0),
-        totalDebited: userTransactions
-          .filter(t => t.type === 'DEBIT' && t.status === 'COMPLETED')
-          .reduce((sum, t) => sum + t.amount, 0),
-        pendingWithdrawals: userTransactions
-          .filter(t => t.type === 'DEBIT' && t.status === 'PENDING')
-          .reduce((sum, t) => sum + t.amount, 0),
-        transactionCount: userTransactions.length,
-        lastTransaction: userTransactions[0] || null
-      };
-
-      res.json({
-        success: true,
-        data: { stats }
+      const wallet = await prisma.wallet.findUnique({
+        where: { userId }
       });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
-  }
 
-  // Admin: Get all transactions
-  async getAllTransactions(req: AuthRequest, res: Response): Promise<void> {
-    try {
-      if (req.userRole !== 'ADMIN') {
-        res.status(403).json({
-          success: false,
-          error: 'Admin access required'
-        });
-        return;
+      if (!wallet) {
+        return res.json({ success: true, transactions: [] });
       }
 
-      res.json({
-        success: true,
-        data: {
-          count: transactions.length,
-          transactions: transactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        }
+      const transactions = await prisma.transaction.findMany({
+        where: { walletId: wallet.id },
+        orderBy: { createdAt: 'desc' },
+        take: Number(limit),
+        skip: Number(offset)
       });
+
+      return res.json({ success: true, transactions });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
+      console.error('Get transactions error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to get transactions' });
     }
   }
 }
 
-export default new WalletController();
+export const walletController = new WalletController();

@@ -3,9 +3,6 @@ import { otpService } from '../services/otpService';
 import { prisma } from '../prisma/client';
 
 export class OTPController {
-  /**
-   * Send otp to phone number
-   */
   async sendOTP(req: Request, res: Response) {
     try {
       const { phone, email, type = 'VERIFICATION' } = req.body;
@@ -21,26 +18,22 @@ export class OTPController {
 
       return res.status(200).json({
         success: true,
-        message: 'otp sent successfully',
+        message: 'OTP sent successfully',
         data: {
           method: result.method,
           expiresIn: result.expiresIn,
-          // Only include otp in development
           ...(process.env.NODE_ENV === 'development' && { otp: result.otp })
         }
       });
     } catch (error: any) {
-      console.error('Send otp error:', error);
+      console.error('Send OTP error:', error);
       return res.status(500).json({
         success: false,
-        message: error.message || 'Failed to send otp'
+        message: error.message || 'Failed to send OTP'
       });
     }
   }
 
-  /**
-   * Verify otp
-   */
   async verifyOTP(req: Request, res: Response) {
     try {
       const { phone, email, otp } = req.body;
@@ -48,7 +41,7 @@ export class OTPController {
       if (!otp) {
         return res.status(400).json({
           success: false,
-          message: 'otp is required'
+          message: 'OTP is required'
         });
       }
 
@@ -71,23 +64,20 @@ export class OTPController {
 
       return res.status(200).json({
         success: true,
-        message: 'otp verified successfully',
+        message: 'OTP verified successfully',
         data: {
           userId: result.userId
         }
       });
     } catch (error: any) {
-      console.error('Verify otp error:', error);
+      console.error('Verify OTP error:', error);
       return res.status(500).json({
         success: false,
-        message: error.message || 'Failed to verify otp'
+        message: error.message || 'Failed to verify OTP'
       });
     }
   }
 
-  /**
-   * Resend otp
-   */
   async resendOTP(req: Request, res: Response) {
     try {
       const { phone, email, type = 'VERIFICATION' } = req.body;
@@ -99,7 +89,7 @@ export class OTPController {
         });
       }
 
-      // Check if there's an existing otp and invalidate it
+      // Invalidate existing OTP
       const existingOtp = await prisma.otp.findFirst({
         where: {
           phone,
@@ -119,7 +109,7 @@ export class OTPController {
 
       return res.status(200).json({
         success: true,
-        message: 'otp resent successfully',
+        message: 'OTP resent successfully',
         data: {
           method: result.method,
           expiresIn: result.expiresIn,
@@ -127,17 +117,14 @@ export class OTPController {
         }
       });
     } catch (error: any) {
-      console.error('Resend otp error:', error);
+      console.error('Resend OTP error:', error);
       return res.status(500).json({
         success: false,
-        message: error.message || 'Failed to resend otp'
+        message: error.message || 'Failed to resend OTP'
       });
     }
   }
 
-  /**
-   * Check if otp is valid (without consuming it)
-   */
   async checkOTP(req: Request, res: Response) {
     try {
       const { phone, email, otp } = req.query;
@@ -145,7 +132,7 @@ export class OTPController {
       if (!otp) {
         return res.status(400).json({
           success: false,
-          message: 'otp is required'
+          message: 'OTP is required'
         });
       }
 
@@ -167,17 +154,14 @@ export class OTPController {
         }
       });
     } catch (error: any) {
-      console.error('Check otp error:', error);
+      console.error('Check OTP error:', error);
       return res.status(500).json({
         success: false,
-        message: error.message || 'Failed to check otp'
+        message: error.message || 'Failed to check OTP'
       });
     }
   }
 
-  /**
-   * Get active OTPs for a phone number (admin/dev only)
-   */
   async getActiveOTPs(req: Request, res: Response) {
     try {
       const { phone } = req.params;
@@ -204,9 +188,6 @@ export class OTPController {
     }
   }
 
-  /**
-   * Get otp for development (dev only)
-   */
   async getDevOTP(req: Request, res: Response) {
     try {
       const { phone } = req.params;
@@ -218,7 +199,6 @@ export class OTPController {
         });
       }
 
-      // Only allow in development
       if (process.env.NODE_ENV !== 'development') {
         return res.status(403).json({
           success: false,
@@ -233,17 +213,14 @@ export class OTPController {
         data: { otp }
       });
     } catch (error: any) {
-      console.error('Get dev otp error:', error);
+      console.error('Get dev OTP error:', error);
       return res.status(500).json({
         success: false,
-        message: error.message || 'Failed to get otp'
+        message: error.message || 'Failed to get OTP'
       });
     }
   }
 
-  /**
-   * Generate otp for specific operation
-   */
   async generateOperationOTP(req: Request, res: Response) {
     try {
       const { phone, email, operation } = req.body;
@@ -259,24 +236,21 @@ export class OTPController {
 
       return res.status(200).json({
         success: true,
-        message: `otp generated for ${operation}`,
+        message: `OTP generated for ${operation}`,
         data: {
           expiresAt: result.expiresAt,
           ...(process.env.NODE_ENV === 'development' && { otp: result.otp })
         }
       });
     } catch (error: any) {
-      console.error('Generate operation otp error:', error);
+      console.error('Generate operation OTP error:', error);
       return res.status(500).json({
         success: false,
-        message: error.message || 'Failed to generate otp'
+        message: error.message || 'Failed to generate OTP'
       });
     }
   }
 
-  /**
-   * Cleanup expired OTPs (admin only)
-   */
   async cleanupExpiredOTPs(req: Request, res: Response) {
     try {
       await otpService.cleanupExpiredOTPs();
@@ -295,5 +269,4 @@ export class OTPController {
   }
 }
 
-// Export a singleton instance
 export const otpController = new OTPController();

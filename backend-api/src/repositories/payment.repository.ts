@@ -1,48 +1,54 @@
-import prisma from '../config/database';
-import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import { PrismaClient, PaymentStatus, PaymentMethod } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export class PaymentRepository {
-    async getStats() {
-        return {
-            totalPayments: await this.count(),
-            completedPayments: await this.count({ where: { status: "COMPLETED" } }),
-            pendingPayments: await this.count({ where: { status: "PENDING" } }),
-            totalAmount: await this.aggregate({ _sum: { amount: true } })
-        };
-    }
   async create(data: {
-    id: string;
+    rideId: string;
     userId: string;
     amount: number;
     method: PaymentMethod;
-    transactionId
     status?: PaymentStatus;
+    transactionId?: string;
   }) {
     return prisma.payment.create({
       data: {
-        id: data.id,
+        rideId: data.rideId,
         userId: data.userId,
         amount: data.amount,
         method: data.method,
-        : data
-        transactionId: data.transactionId,
         status: data.status || 'PENDING',
+        transactionId: data.transactionId || null,
       },
     });
   }
 
-  async findByid(id: string) {
+  async findById(id: string) {
     return prisma.payment.findUnique({
       where: { id },
-      include: { ride: true,  },
+      include: {
+        ride: true,
+        user: true,
+      },
     });
   }
 
   async findByUser(userId: string) {
     return prisma.payment.findMany({
       where: { userId },
-      include: { ride: true },
       orderBy: { createdAt: 'desc' },
+      include: {
+        ride: true,
+      },
+    });
+  }
+
+  async findByRide(rideId: string) {
+    return prisma.payment.findUnique({
+      where: { rideId },
+      include: {
+        user: true,
+      },
     });
   }
 
@@ -51,11 +57,41 @@ export class PaymentRepository {
       where: { id: paymentId },
       data: {
         status,
-        transactionId,
+        transactionId: transactionId || null,
         completedAt: status === 'COMPLETED' ? new Date() : undefined,
       },
     });
   }
+
+  async getStats() {
+    const [totalPayments, completedPayments, pendingPayments, failedPayments] = await Promise.all([
+      prisma.payment.count(),
+      prisma.payment.count({ where: { status: 'COMPLETED' } }),
+      prisma.payment.count({ where: { status: 'PENDING' } }),
+      prisma.payment.count({ where: { status: 'FAILED' } }),
+    ]);
+
+    const totalAmount = await prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { status: 'COMPLETED' },
+    });
+
+    return {
+      totalPayments,
+      completedPayments,
+      pendingPayments,
+      failedPayments,
+      totalAmount: totalAmount._sum.amount || 0,
+    };
+  }
+
+  async count(where?: any) {
+    return prisma.payment.count({ where });
+  }
+
+  async aggregate(data: any) {
+    return prisma.payment.aggregate(data);
+  }
 }
 
-export default PaymentRepository;
+export const paymentRepository = new PaymentRepository();

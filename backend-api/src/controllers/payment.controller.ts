@@ -149,9 +149,7 @@ export class PaymentController {
           data: {
             walletId: driver.user.wallet?.id || '',
             amount: -amount,
-            description: `Withdrawal to ${ || driver.user.phone}`,
-            reference: withdrawal.data?.tx_ref,
-            status: 'COMPLETED',
+description: `Withdrawal to ${driver?.user?.phone || ''}`,            status: 'COMPLETED',
           },
         });
 

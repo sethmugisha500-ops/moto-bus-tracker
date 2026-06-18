@@ -1,84 +1,116 @@
-import prisma from '../config/database';
-import { DriverRepository } from '../repositories/driver.repository';
-
-const driverRepo = new DriverRepository();
+import { prisma } from '../prisma/client';
 
 export class LocationService {
-  async updateDriverLocation(id: string, lat: number, lng: number, isOnline: boolean) {
-    // Update driver location
-    const driver = await driverRepo.updateLocation(id, lat, lng, isOnline);
+  async updateDriverLocation(driverId: string, lat: number, lng: number, isOnline: boolean) {
+    try {
+      // Update driver's current location
+      await prisma.driver.update({
+        where: { id: driverId },
+        data: {
+          currentLat: lat,
+          currentLng: lng,
+          isOnline: isOnline
+        }
+      });
 
-    // Save to location history
-    await prisma.driverLocation.upsert({
-      where: { id },
-      update: { lat, lng, isOnline: isOnline, updatedAt: new Date() },
-      create: { id, lat, lng, isOnline: isOnline },
-    });
+      // Create location history record
+      const location = await prisma.driverLocation.create({
+        data: {
+          driverId,
+          userId: (await prisma.driver.findUnique({ where: { id: driverId } }))!.userId,
+          lat,
+          lng
+        }
+      });
 
-    // Broadcast to nearby riders via WebSocket
-    // io.emit(`driver:${id}:location`, { id, lat, lng, isOnline });
-
-    return driver;
+      return location;
+    } catch (error) {
+      console.error('Update driver location error:', error);
+      throw error;
+    }
   }
 
-  async getNearbyDrivers(lat: number, lng: number, radiusKm = 5) {
-    return driverRepo.getNearbyDrivers(lat, lng, radiusKm);
+  async getDriverLocation(driverId: string) {
+    try {
+      const driver = await prisma.driver.findUnique({
+        where: { id: driverId },
+        select: {
+          currentLat: true,
+          currentLng: true,
+          isOnline: true,
+          updatedAt: true
+        }
+      });
+      return driver;
+    } catch (error) {
+      console.error('Get driver location error:', error);
+      throw error;
+    }
   }
 
-  async saveRideLocation(id: string, id: string, lat: number, lng: number, speed?: number, heading?: number) {
-    return prisma.rideLocation.create({
-      data: {
-        id,
-        id,
-        lat,
-        lng,
-        speed,
-        heading,
+  async getNearbyDrivers(lat: number, lng: number, radiusKm: number = 5) {
+    // Simplified - in production use PostGIS or similar
+    const drivers = await prisma.driver.findMany({
+      where: {
+        isOnline: true,
+        isApproved: true,
+        currentLat: { not: null },
+        currentLng: { not: null }
       },
+      include: {
+        user: {
+          select: {
+            name: true,
+            phone: true,
+            rating: true
+          }
+        }
+      },
+      take: 20
     });
+
+    // Calculate distance in a real implementation
+    return drivers;
   }
 
-  async getRidePath(id: string) {
-    return prisma.rideLocation.findMany({
-      where: { id },
-      orderBy: { timestamp: 'asc' },
-    });
+  async createRideLocation(rideId: string, lat: number, lng: number) {
+    try {
+      return await prisma.rideLocation.create({
+        data: {
+          rideId,
+          lat,
+          lng
+        }
+      });
+    } catch (error) {
+      console.error('Create ride location error:', error);
+      throw error;
+    }
   }
 
-  async calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): Promise<number> {
-    const R = 6371; // Earth's radius in km
-    const dLat = this.toRad(lat2 - lat1);
-    const dLng = this.toRad(lng2 - lng1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+  async getRideLocations(rideId: string) {
+    try {
+      return await prisma.rideLocation.findMany({
+        where: { rideId },
+        orderBy: { timestamp: 'asc' }
+      });
+    } catch (error) {
+      console.error('Get ride locations error:', error);
+      throw error;
+    }
   }
 
-  private toRad(degrees: number): number {
-    return degrees * (Math.PI / 180);
-  }
-
-  async estimateETA(distanceKm: number, vehicle, // km/h
-      TUKTUK: 30,
-      BUS: 25,
+  async estimateFare(distanceKm: number, vehicleType: string) {
+    const baseFare = 200;
+    const perKmRates: Record<string, number> = {
+      'MOTO': 300,
+      'TUKTUK': 400,
+      'BUS': 250,
+      'MINIBUS': 300
     };
-    const speed = speeds[vehicleType as keyof typeof speeds] || 30;
-    const timeHours = distanceKm / speed;
-    return Math.ceil(timeHours * 60); // return minutes
-  }
-
-  async estimateFare(distanceKm: number, vehicle,
-      }
-    const perKmRates = {
-      MOTO: 300,
-      TUKTUK: 200,
-      BUS: 100,
-    };
-    const base = baseFares[vehicleType as keyof typeof baseFares] || 500;
-    const perKm = perKmRates[vehicleType as keyof typeof perKmRates] || 200;
-    return base + (distanceKm * perKm);
+    const rate = perKmRates[vehicleType] || 300;
+    return baseFare + (distanceKm * rate);
   }
 }
+
+export const locationService = new LocationService();

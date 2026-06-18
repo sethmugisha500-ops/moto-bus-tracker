@@ -1,95 +1,55 @@
 import { Request, Response } from 'express';
-import prisma from '../config/database';
-import { UserRepository } from '../repositories/user.repository';
-import { RideRepository } from '../repositories/ride.repository';
-import { DriverRepository } from '../repositories/driver.repository';
-import { PaymentRepository } from '../repositories/payment.repository';
-
-const userRepo = new UserRepository();
-const rideRepo = new RideRepository();
-const driverRepo = new DriverRepository();
-const paymentRepo = new PaymentRepository();
+import { AuthRequest } from '../middleware/auth.middleware';
+import { prisma } from '../prisma/client';
 
 export class AdminController {
   async getDashboardStats(req: Request, res: Response) {
     try {
-      const userStats = await userRepo.getStats();
-      const rideStats = await // // // rideRepo.getDashboardStats() // Method not implemented;
-      const paymentStats = await // paymentRepo.getStats() // Method not implemented;
+      const totalUsers = await prisma.user.count();
+      const totalDrivers = await prisma.driver.count();
+      const totalRides = await prisma.ride.count();
+      const totalRevenue = await prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { status: 'COMPLETED' }
+      });
 
-      // Get recent activity
-      // const recentRides = await prisma.ride.findMany({
+      const recentRides = await prisma.ride.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
         include: {
-          rider: true,
-          driver: { include: {  } },
-        },
-      });
-
-      const recentDrivers = await prisma.driver.findMany({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: {   },
-      });
-
-      const recentUsers = await prisma.user.findMany({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
+          rider: { select: { name: true, phone: true } },
+          driver: { include: { user: { select: { name: true } } } }
+        }
       });
 
       return res.json({
         success: true,
-        stats: {
-          ...userStats,
-          ...rideStats,
-          ...paymentStats,
-        },
-        recent: {
-          rides: recentRides,
-          drivers: recentDrivers,
-          users: recentUsers,
-        },
+        data: {
+          totalUsers,
+          totalDrivers,
+          totalRides,
+          totalRevenue: totalRevenue._sum.amount || 0,
+          recentRides
+        }
       });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+    } catch (error) {
+      console.error('Dashboard stats error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to get stats' });
     }
   }
 
   async getAllUsers(req: Request, res: Response) {
     try {
-      const { page = 1, limit = 50, role } = req.query;
-      const skip = (Number(page) - 1) * Number(limit);
-
-      const where: any = {};
-      if (role) where.role = role;
-
-      const [users, total] = await Promise.all([
-        prisma.user.findMany({
-          where,
-          skip,
-          take: Number(limit),
-          include: {
-            driver: { include: {  } },
-            wallet: true,
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.user.count({ where }),
-      ]);
-
-      return res.json({
-        success: true,
-        users,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total,
-          pages: Math.ceil(total / Number(limit)),
+      const users = await prisma.user.findMany({
+        include: {
+          driver: true,
+          wallet: true
         },
+        orderBy: { createdAt: 'desc' }
       });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.json({ success: true, data: users });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to get users' });
     }
   }
 
@@ -99,155 +59,86 @@ export class AdminController {
       const user = await prisma.user.findUnique({
         where: { id },
         include: {
-          driver: { include: {  } },
+          driver: true,
           wallet: true,
-          ridesAsRider: { take: 10, orderBy: { createdAt: 'desc' } },
-          ridesAsDriver: { take: 10, orderBy: { createdAt: 'desc' } },
-        },
+          payments: true,
+          ratings: true
+        }
       });
-
       if (!user) {
         return res.status(404).json({ success: false, message: 'User not found' });
       }
-
-      return res.json({ success: true, user });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.json({ success: true, data: user });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to get user' });
     }
   }
 
   async updateUser(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { name, email, role, isOnline } = req.body;
-
+      const { name, phone, email, role, isActive } = req.body;
+      
       const user = await prisma.user.update({
         where: { id },
-        data: { name, email, role, isOnline },
+        data: { name, phone, email, role, isActive }
       });
-
-      return res.json({ success: true, user });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.json({ success: true, data: user });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to update user' });
     }
   }
 
   async getAllDrivers(req: Request, res: Response) {
     try {
-      const { page = 1, limit = 50, isApproved, isOnline } = req.query;
-      const skip = (Number(page) - 1) * Number(limit);
-
-      const where: any = {};
-      if (isApproved !== undefined) where.isApproved = isApproved === 'true';
-      if (isOnline !== undefined) where.isOnline = isOnline === 'true';
-
-      const [drivers, total] = await Promise.all([
-        prisma.driver.findMany({
-          where,
-          skip,
-          take: Number(limit),
-          include: {   },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.driver.count({ where }),
-      ]);
-
-      return res.json({
-        success: true,
-        drivers,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total,
-          pages: Math.ceil(total / Number(limit)),
-        },
+      const drivers = await prisma.driver.findMany({
+        include: { user: true },
+        orderBy: { createdAt: 'desc' }
       });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.json({ success: true, data: drivers });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to get drivers' });
     }
   }
 
   async approveDriver(req: Request, res: Response) {
     try {
       const { id } = req.params;
-
       const driver = await prisma.driver.update({
         where: { id },
-        data: { isApproved: true },
-        include: {  },
+        data: { isApproved: true }
       });
-
-      // Send notification to driver
-      // await notificationService.sendToUser(driver.userId, {
-      //   title: 'Driver Application Approved',
-      //   message: 'Congratulations! You can now accept rides.',
-      // });
-
-      return res.json({ success: true, driver });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.json({ success: true, data: driver });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to approve driver' });
     }
   }
 
   async rejectDriver(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { reason } = req.body;
-
       const driver = await prisma.driver.update({
         where: { id },
-        data: { isApproved: false },
-        include: {  },
+        data: { isApproved: false }
       });
-
-      // Send rejection notification
-      // await notificationService.sendToUser(driver.userId, {
-      //   title: 'Driver Application Update',
-      //   message: reason || 'Your application requires additional information.',
-      // });
-
-      return res.json({ success: true, driver });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.json({ success: true, data: driver });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to reject driver' });
     }
   }
 
   async getAllRides(req: Request, res: Response) {
     try {
-      const { page = 1, limit = 50, status } = req.query;
-      const skip = (Number(page) - 1) * Number(limit);
-
-      const where: any = {};
-      if (status) where.status = status;
-
-      const [rides, total] = await Promise.all([
-        prisma.ride.findMany({
-          where,
-          skip,
-          take: Number(limit),
-          include: {
-            rider: true,
-            driver: { include: {   } },
-            payment: true,
-            rating: true,
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.ride.count({ where }),
-      ]);
-
-      return res.json({
-        success: true,
-        rides,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total,
-          pages: Math.ceil(total / Number(limit)),
+      const rides = await prisma.ride.findMany({
+        include: {
+          rider: { select: { name: true, phone: true } },
+          driver: { include: { user: { select: { name: true } } } }
         },
+        orderBy: { createdAt: 'desc' }
       });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.json({ success: true, data: rides });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to get rides' });
     }
   }
 
@@ -258,58 +149,56 @@ export class AdminController {
         where: { id },
         include: {
           rider: true,
-          driver: { include: {   } },
-          locations: { orderBy: { timestamp: 'asc' } },
+          driver: { include: { user: true } },
           payment: true,
-          rating: true,
-        },
+          rating: true
+        }
       });
-
       if (!ride) {
         return res.status(404).json({ success: false, message: 'Ride not found' });
       }
-
-      return res.json({ success: true, ride });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+      return res.json({ success: true, data: ride });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to get ride' });
     }
   }
 
   async getSystemStats(req: Request, res: Response) {
     try {
-      const now = new Date();
-      const startOfDay = new Date(now.setHours(0, 0, 0, 0));
-      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-      const [daily, weekly, monthly] = await Promise.all([
-        prisma.ride.aggregate({
-          where: { createdAt: { gte: startOfDay } },
-          _count: true,
-          _sum: { fare: true },
-        }),
-        prisma.ride.aggregate({
-          where: { createdAt: { gte: startOfWeek } },
-          _count: true,
-          _sum: { fare: true },
-        }),
-        prisma.ride.aggregate({
-          where: { createdAt: { gte: startOfMonth } },
-          _count: true,
-          _sum: { fare: true },
-        }),
+      const [
+        totalUsers,
+        totalDrivers,
+        totalRides,
+        totalPayments,
+        totalRatings
+      ] = await Promise.all([
+        prisma.user.count(),
+        prisma.driver.count(),
+        prisma.ride.count(),
+        prisma.payment.count(),
+        prisma.rating.count()
       ]);
+
+      const revenue = await prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { status: 'COMPLETED' }
+      });
 
       return res.json({
         success: true,
-        stats: {
-          daily: { rides: daily._count, revenue: daily._sum.fare || 0 },
-          weekly: { rides: weekly._count, revenue: weekly._sum.fare || 0 },
-          monthly: { rides: monthly._count, revenue: monthly._sum.fare || 0 },
-        },
+        data: {
+          totalUsers,
+          totalDrivers,
+          totalRides,
+          totalPayments,
+          totalRatings,
+          totalRevenue: revenue._sum.amount || 0
+        }
       });
-    } catch (error: any) {
-      return res.status(500).json({ success: false, message: error.message });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to get system stats' });
     }
   }
 }
+
+export const adminController = new AdminController();

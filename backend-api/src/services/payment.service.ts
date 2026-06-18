@@ -2,21 +2,32 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export class PaymentService {
-  async processPayment(id: string, method: string, amount: number, phoneNumber?: string) {
+  async processPayment(rideId: string, method: string, amount: number, phoneNumber?: string) {
+    const ride = await prisma.ride.findUnique({
+      where: { id: rideId },
+      select: { riderId: true }
+    });
+
+    if (!ride) {
+      throw new Error('Ride not found');
+    }
+
     const payment = await prisma.payment.create({
       data: {
-        id,
-        userId: (await prisma.ride.findUnique({ where: { id: id } }))!.riderId,
+        rideId,
+        userId: ride.riderId,
         amount,
         method: method as any,
         status: 'COMPLETED',
         completedAt: new Date(),
       },
     });
+
     await prisma.ride.update({
-      where: { id: id },
+      where: { id: rideId },
       data: { paymentStatus: 'COMPLETED' },
     });
+
     return payment;
   }
 

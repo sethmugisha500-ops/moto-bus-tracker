@@ -1,4 +1,3 @@
-// prisma/seed.ts
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -187,11 +186,11 @@ async function main() {
   console.log(`✅ Created ${await prisma.user.count()} users`);
 
   // ============================================
-  // 2. CREATE OTP RECORDS (for testing)
+  // 2. CREATE otp RECORDS (for testing)
   // ============================================
-  console.log('\n🔑 Creating OTP records for testing...');
+  console.log('\n🔑 Creating otp records for testing...');
 
-  // Create OTPs for each user
+  // Create otps for each user
   const otpData = [
     { phone: '+250788123456', otp: '123456' },
     { phone: '+250788123457', otp: '234567' },
@@ -201,8 +200,9 @@ async function main() {
     { phone: '+250788123403', otp: '678901' },
   ];
 
+  // FIX: Use 'otp' (lowercase) - the model name is 'otp' in schema
   for (const data of otpData) {
-    await prisma.oTP.create({
+    await prisma.otp.create({
       data: {
         phone: data.phone,
         otp: data.otp,
@@ -213,7 +213,7 @@ async function main() {
     });
   }
 
-  console.log(`✅ Created ${otpData.length} OTP records`);
+  console.log(`✅ Created ${otpData.length} otp records`);
 
   // ============================================
   // 3. CREATE COMPLETED RIDES
@@ -451,6 +451,7 @@ async function main() {
   // ============================================
   console.log('\n🚨 Creating SOS alerts...');
 
+  // FIX: Use 'sOSAlert' or 'sosAlert' depending on your schema
   await prisma.sOSAlert.create({
     data: {
       userId: rider1.id,
@@ -561,7 +562,8 @@ async function main() {
   console.log(`   ⭐ Ratings: ${await prisma.rating.count()}`);
   console.log(`   🔔 Notifications: ${await prisma.notification.count()}`);
   console.log(`   👛 Wallets: ${await prisma.wallet.count()}`);
-  console.log(`   🔑 OTPs: ${await prisma.oTP.count()}`);
+  // FIX: Use 'otp' (lowercase)
+  console.log(`   🔑 otps: ${await prisma.otp.count()}`);
   console.log(`   🚨 SOS Alerts: ${await prisma.sOSAlert.count()}`);
 
   // Driver details
@@ -598,12 +600,13 @@ async function main() {
     console.log(`   ${i + 1}. ${ride.rider.name} → ${ride.dropoffAddress} [${ride.status}]`);
   });
 
-  console.log('\n🔑 TEST OTPs:');
-  const otps = await prisma.oTP.findMany({
+  console.log('\n🔑 TEST otps:');
+  // FIX: Use 'otp' (lowercase) and add proper typing
+  const otps = await prisma.otp.findMany({
     where: { isUsed: false },
     take: 5,
   });
-  otps.forEach((otp, i) => {
+  otps.forEach((otp: any, i: number) => {
     console.log(`   ${i + 1}. ${otp.phone} → ${otp.otp} (expires: ${otp.expiresAt.toLocaleTimeString()})`);
   });
 

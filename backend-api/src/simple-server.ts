@@ -24,8 +24,9 @@ app.post('/api/auth/send-otp', (req, res) => {
   
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   console.log(`📱 OTP for ${phone}: ${otp}`);
-  
-  res.json({ 
+
+  // Return the response to ensure all code paths return a value
+  return res.json({ 
     success: true, 
     message: 'OTP sent successfully',
     devOtp: otp
@@ -34,37 +35,37 @@ app.post('/api/auth/send-otp', (req, res) => {
 
 // Verify OTP
 app.post('/api/auth/verify-otp', (req, res) => {
-  const { phone, otp } = req.body;
-  
-  if (!phone || !otp) {
-    return res.status(400).json({ success: false, message: 'Phone and OTP required' });
-  }
-  
-  // Accept any 6-digit OTP for testing
-  if (otp.length === 6) {
-    const token = Buffer.from(JSON.stringify({ userId: Date.now(), phone })).toString('base64');
-    
-    // Check if user exists, if not create
-    let user = users.find(u => u.phone === phone);
-    if (!user) {
-      user = { id: Date.now().toString(), phone, name: `User_${phone.slice(-4)}`, role: 'rider' };
-      users.push(user);
+    const { phone, otp } = req.body;
+
+    if (!phone || !otp) {
+      return res.status(400).json({ success: false, message: 'Phone and OTP required' });
     }
-    
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        phone: user.phone,
-        role: user.role,
-      },
-    });
-  } else {
-    res.status(400).json({ success: false, message: 'Invalid OTP' });
-  }
-});
+
+    // Accept any 6-digit OTP for testing
+    if (otp.length === 6) {
+      const token = Buffer.from(JSON.stringify({ userId: Date.now(), phone })).toString('base64');
+
+      // Check if user exists, if not create
+      let user = users.find(u => u.phone === phone);
+      if (!user) {
+        user = { id: Date.now().toString(), phone, name: `User_${phone.slice(-4)}`, role: 'rider' };
+        users.push(user);
+      }
+
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          phone: user.phone,
+          role: user.role,
+        },
+      });
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+  });
 
 // ============ RIDER ENDPOINTS ============
 

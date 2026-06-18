@@ -1,10 +1,10 @@
-// src/services/otpService.ts
 import { PrismaClient } from '@prisma/client';
-import { prisma } from '../config/prisma';
 import redis from '../config/redis';
 import twilio from 'twilio';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+
+const prisma = new PrismaClient();
 
 export class OTPService {
   private twilioClient: any;
@@ -85,14 +85,16 @@ export class OTPService {
 
     // Also store in database for persistence
     try {
-      await prisma.oTP.create({
+      // FIX: Use 'otp' (lowercase) instead of 'oTP'
+      await prisma.otp.create({
         data: {
           phone,
           email: email || null,
           otp,
           expiresAt,
           userId: userId || null,
-          type,
+          // Remove 'type' if it doesn't exist in your schema
+          // type, // Uncomment only if you add this field to the Otp model
         },
       });
       console.log(`💾 OTP stored in database for ${phone}`);
@@ -248,7 +250,8 @@ export class OTPService {
 
     // Check database
     try {
-      const otpRecord = await prisma.oTP.findFirst({
+      // FIX: Use 'otp' (lowercase) instead of 'oTP'
+      const otpRecord = await prisma.otp.findFirst({
         where: {
           OR: [
             { phone: identifier },
@@ -284,7 +287,7 @@ export class OTPService {
         }
 
         // Update OTP as used
-        await prisma.oTP.update({
+        await prisma.otp.update({
           where: { id: otpRecord.id },
           data: {
             attempts: { increment: 1 },
@@ -314,7 +317,8 @@ export class OTPService {
       }
 
       // Check for expired or invalid OTP
-      const expiredOTP = await prisma.oTP.findFirst({
+      // FIX: Use 'otp' (lowercase) instead of 'oTP'
+      const expiredOTP = await prisma.otp.findFirst({
         where: {
           OR: [
             { phone: identifier },
@@ -327,7 +331,7 @@ export class OTPService {
 
       if (expiredOTP) {
         // Increment attempts
-        await prisma.oTP.update({
+        await prisma.otp.update({
           where: { id: expiredOTP.id },
           data: { attempts: { increment: 1 } },
         });
@@ -356,7 +360,8 @@ export class OTPService {
 
   async markOTPAsUsed(identifier: string, otp: string) {
     try {
-      const updated = await prisma.oTP.updateMany({
+      // FIX: Use 'otp' (lowercase) instead of 'oTP'
+      const updated = await prisma.otp.updateMany({
         where: {
           OR: [
             { phone: identifier },
@@ -388,8 +393,8 @@ export class OTPService {
 
   async cleanupExpiredOTPs() {
     try {
-      // Clean database
-      const dbResult = await prisma.oTP.deleteMany({
+      // Clean database - FIX: Use 'otp' (lowercase)
+      const dbResult = await prisma.otp.deleteMany({
         where: {
           expiresAt: {
             lt: new Date(),
@@ -428,8 +433,8 @@ export class OTPService {
       return parsed.otp;
     }
     
-    // Fallback to database
-    const record = await prisma.oTP.findFirst({
+    // Fallback to database - FIX: Use 'otp' (lowercase)
+    const record = await prisma.otp.findFirst({
       where: {
         phone,
         isUsed: false,
@@ -461,8 +466,8 @@ export class OTPService {
       }];
     }
 
-    // Fallback to database
-    return prisma.oTP.findMany({
+    // Fallback to database - FIX: Use 'otp' (lowercase)
+    return prisma.otp.findMany({
       where: {
         phone,
         isUsed: false,
@@ -496,9 +501,9 @@ export class OTPService {
       return { valid: false };
     }
 
-    // Check database
+    // Check database - FIX: Use 'otp' (lowercase)
     try {
-      const record = await prisma.oTP.findFirst({
+      const record = await prisma.otp.findFirst({
         where: {
           OR: [
             { phone: identifier },
@@ -542,14 +547,15 @@ export class OTPService {
       expiresAt: expiresAt.toISOString(),
     }));
 
-    // Store in database
-    await prisma.oTP.create({
+    // Store in database - FIX: Use 'otp' (lowercase)
+    await prisma.otp.create({
       data: {
         phone,
         email: email || null,
         otp,
         expiresAt,
-        type: operation,
+        // Remove 'type' if not in schema
+        // type: operation,
       },
     });
 

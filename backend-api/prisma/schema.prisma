@@ -57,7 +57,7 @@ model User {
   rides         Ride[]
   sosAlerts     SOSAlert[]
   notifications Notification[]
-  otps          OTP[]
+  Otp           Otp[]
 
   driverLocations DriverLocation[]
   trackingData    TrackingData[]
@@ -80,9 +80,9 @@ model Driver {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ratings Rating[]
-  rides   Ride[]
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ratings   Rating[]
+  rides     Ride[]
   locations DriverLocation[]
 }
 
@@ -107,12 +107,12 @@ model Ride {
   completedAt    DateTime?
   cancelledAt    DateTime?
 
-  rider    User       @relation(fields: [riderId], references: [id])
-  driver   Driver?    @relation(fields: [driverId], references: [id])
-  payment  Payment?
-  rating   Rating?
-  sosAlerts SOSAlert[]
-  locations RideLocation[]
+  rider        User           @relation(fields: [riderId], references: [id])
+  driver       Driver?        @relation(fields: [driverId], references: [id])
+  payment      Payment?
+  rating       Rating?
+  sosAlerts    SOSAlert[]
+  locations    RideLocation[]
   trackingData TrackingData[]
 }
 
@@ -138,7 +138,7 @@ model Wallet {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 }
 
@@ -181,7 +181,7 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model OTP {
+model Otp {
   id        String   @id @default(cuid())
   phone     String
   email     String?
@@ -205,7 +205,7 @@ model DriverLocation {
   lat       Float
   lng       Float
   timestamp DateTime @default(now())
-  
+
   driver Driver @relation(fields: [driverId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
 }
@@ -216,7 +216,7 @@ model RideLocation {
   lat       Float
   lng       Float
   timestamp DateTime @default(now())
-  
+
   ride Ride @relation(fields: [rideId], references: [id])
 }
 
@@ -227,7 +227,7 @@ model TrackingData {
   lat       Float
   lng       Float
   timestamp DateTime @default(now())
-  
+
   user User @relation(fields: [userId], references: [id])
   ride Ride @relation(fields: [rideId], references: [id])
 }
@@ -241,6 +241,6 @@ model Transaction {
   reference   String?
   status      String   @default("PENDING")
   createdAt   DateTime @default(now())
-  
+
   wallet Wallet @relation(fields: [walletId], references: [id])
 }

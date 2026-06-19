@@ -1,16 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = (global as any).prisma || new PrismaClient();
-if (process.env.NODE_ENV !== 'production') (global as any).prisma = prisma;
+import { prisma } from '../prisma/client';
 
 export interface AuthRequest extends Request {
     user?: {
         id: string;
         phone: string;
+        name: string;
         role: string;
-        name?: string; // Made optional to fix structural type compilation conflicts
     };
 }
 
@@ -41,22 +38,22 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         }
 
         req.user = user;
-        return next();
+        next();
     } catch (error) {
         res.status(401).json({ success: false, message: 'Invalid or expired token' });
         return;
     }
 };
 
-export const authorize = (...roles: string[]): (req: AuthRequest, res: Response, next: NextFunction) => void => {
+export const authorize = (...roles: string[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction): void => {
         if (!req.user) {
-             res.status(401).json({ success: false, message: 'Authentication required' });
-             return;
+            res.status(401).json({ success: false, message: 'Authentication required' });
+            return;
         }
         if (!roles.includes(req.user.role)) {
-             res.status(403).json({ success: false, message: 'Access denied' });
-             return;
+            res.status(403).json({ success: false, message: 'Access denied' });
+            return;
         }
         next();
     };

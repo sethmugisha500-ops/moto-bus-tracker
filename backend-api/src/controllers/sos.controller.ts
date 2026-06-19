@@ -1,130 +1,346 @@
 import { Request, Response } from 'express';
-import prisma from '../config/database';
-import { NotificationService } from '../services/notification.service';
-
-const notificationService = new NotificationService();
+import { AuthRequest } from '../middleware/auth.middleware';
+import { prisma } from '../../prisma/client';
 
 export class SOSController {
-  method(arg0: string, arg1: any, method: any) {
-      throw new Error('Method not implemented.');
-  }
-  async triggerSOS(req: Request, res: Response) {
+  // ============================================
+  // TRIGGER SOS
+  // ============================================
+  async triggerSOS(req: AuthRequest, res: Response) {
     try {
-      const { id, lat, lng } = req.body;
-      const userId = (req as any).user!.id;
+      const { rideId, lat, lng } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      if (!rideId) {
+        return res.status(400).json({ success: false, message: 'Ride ID is required' });
+      }
 
       // Get ride details
       const ride = await prisma.ride.findUnique({
-        where: { id: id },
+        where: { id: rideId },
         include: {
-          rider: true,
-        },
+          rider: {
+            select: {
+              id: true,
+              name: true,
+              phone: true
+            }
+          },
+          driver: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  phone: true
+                }
+              }
+            }
+          }
+        }
       });
 
       if (!ride) {
-        res.status(404).json({ success: false, message: 'Ride not found' });
-        return;
+        return res.status(404).json({ success: false, message: 'Ride not found' });
       }
 
-      // Update ride status
+      // Update ride status to STARTED (SOS activated)
       await prisma.ride.update({
-        where: { id: id },
-        data: { status: 'STARTED' },
+        where: { id: rideId },
+        data: { status: 'STARTED' }
       });
 
       // Create SOS alert record
       const sosAlert = await prisma.sOSAlert.create({
         data: {
           userId,
-          rideId: id,
+          rideId,
           lat: lat || ride.pickupLat,
           lng: lng || ride.pickupLng,
-          status: 'ACTIVE',
-        },
+          status: 'ACTIVE'
+        }
       });
 
-      // Notify emergency contacts
-      const emergencyContacts = [
-        { name: 'Police', phone: '112' },
-        { name: 'Ambulance', phone: '114' },
-        { name: 'Emergency Contact', phone: '+250788123456' },
-      ];
-
-      // Notify admin
-      await notificationService.sendToAdmin({
-        title: 'SOS Alert Activated',
-        message: `User ${(ride as any).rider?.name || 'Rider'} activated SOS on ride ${ride.id}`,
-        data: { id, sosAlertId: sosAlert.id },
+      // Create notification for admin
+      await prisma.notification.create({
+        data: {
+          userId: userId,
+          title: '🚨 SOS Alert Activated',
+          message: `SOS alert triggered by ${ride.rider?.name || 'Rider'} on ride ${rideId}`,
+          type: 'SOS_ALERT'
+        }
       });
 
-      res.json({
+      // If driver exists, notify them
+      if (ride.driver) {
+        await prisma.notification.create({
+          data: {
+            userId: ride.driver.userId,
+            title: '🚨 SOS Alert on Your Ride',
+            message: `Your passenger has activated SOS on ride ${rideId}`,
+            type: 'SOS_ALERT'
+          }
+        });
+      }
+
+      return res.json({
         success: true,
-        message: 'SOS alert sent. Emergency services have been notified.',
-        sosAlert,
+        message: 'SOS alert sent successfully. Emergency services have been notified.',
+        data: {
+          sosAlert,
+          ride: {
+            id: ride.id,
+            riderName: ride.rider?.name,
+            driverName: ride.driver?.user?.name
+          }
+        }
       });
-      return;
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
-      return;
+      console.error('Trigger SOS error:', error);
+      return res.status(500).json({ success: false, message: error.message || 'Failed to trigger SOS' });
     }
   }
 
-  async resolveSOS(req: Request, res: Response) {
+  // ============================================
+  // RESOLVE SOS
+  // ============================================
+  async resolveSOS(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
+      const userId = req.user?.id;
 
-     const sosAlert = await prisma.sOSAlert.update({
-  where: { id },
-  data: {
-    status: 'RESOLVED',
-    // resolvedAt: new Date(), <-- Remove this line if it's not in your schema.prisma
-  },
-});
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
 
-      res.json({
+      const sosAlert = await prisma.sOSAlert.findUnique({
+        where: { id }
+      });
+
+      if (!sosAlert) {
+        return res.status(404).json({ success: false, message: 'SOS alert not found' });
+      }
+
+      // Update SOS alert status
+      const resolvedAlert = await prisma.sOSAlert.update({
+        where: { id },
+        data: { status: 'RESOLVED' }
+      });
+
+      // Create notification
+      await prisma.notification.create({
+        data: {
+          userId: sosAlert.userId,
+          title: '✅ SOS Alert Resolved',
+          message: `SOS alert has been resolved by admin`,
+          type: 'SOS_RESOLVED'
+        }
+      });
+
+      return res.json({
         success: true,
-        message: 'SOS alert resolved',
-        sosAlert,
+        message: 'SOS alert resolved successfully',
+        data: resolvedAlert
       });
-      return;
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
-      return;
+      console.error('Resolve SOS error:', error);
+      return res.status(500).json({ success: false, message: error.message || 'Failed to resolve SOS' });
     }
   }
 
-  async getActiveSOS(req: Request, res: Response) {
+  // ============================================
+  // GET ACTIVE SOS ALERTS
+  // ============================================
+  async getActiveSOS(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      // Check if user is admin
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true }
+      });
+
+      const isAdmin = user?.role === 'ADMIN';
+
+      const where = isAdmin
+        ? { status: 'ACTIVE' }
+        : { userId, status: 'ACTIVE' };
+
       const activeAlerts = await prisma.sOSAlert.findMany({
-        where: { status: 'ACTIVE' },
+        where,
         include: {
-          ride: true,
+          ride: {
+            include: {
+              rider: {
+                select: {
+                  id: true,
+                  name: true,
+                  phone: true
+                }
+              },
+              driver: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      phone: true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              phone: true
+            }
+          }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: 'desc' }
       });
 
-      res.json({ success: true, alerts: activeAlerts });
-      return;
+      return res.json({
+        success: true,
+        data: activeAlerts
+      });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
-      return;
+      console.error('Get active SOS error:', error);
+      return res.status(500).json({ success: false, message: error.message || 'Failed to get active SOS alerts' });
     }
   }
 
-  async getUserSOSHistory(req: Request, res: Response) {
+  // ============================================
+  // GET USER SOS HISTORY
+  // ============================================
+  async getUserSOSHistory(req: AuthRequest, res: Response) {
     try {
-      const userId = (req as any).user!.id;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
       const alerts = await prisma.sOSAlert.findMany({
         where: { userId },
-        include: { ride: true },
-        orderBy: { createdAt: 'desc' },
+        include: {
+          ride: {
+            include: {
+              rider: {
+                select: {
+                  id: true,
+                  name: true,
+                  phone: true
+                }
+              },
+              driver: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      phone: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
       });
 
-      res.json({ success: true, alerts });
-      return;
+      return res.json({
+        success: true,
+        data: alerts
+      });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
-      return;
+      console.error('Get SOS history error:', error);
+      return res.status(500).json({ success: false, message: error.message || 'Failed to get SOS history' });
+    }
+  }
+
+  // ============================================
+  // GET SOS BY ID
+  // ============================================
+  async getSOSById(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const sosAlert = await prisma.sOSAlert.findUnique({
+        where: { id },
+        include: {
+          ride: {
+            include: {
+              rider: {
+                select: {
+                  id: true,
+                  name: true,
+                  phone: true
+                }
+              },
+              driver: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      phone: true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              phone: true
+            }
+          }
+        }
+      });
+
+      if (!sosAlert) {
+        return res.status(404).json({ success: false, message: 'SOS alert not found' });
+      }
+
+      // Check if user is authorized (admin or the one who triggered the SOS)
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true }
+      });
+
+      const isAuthorized = user?.role === 'ADMIN' || sosAlert.userId === userId;
+
+      if (!isAuthorized) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+
+      return res.json({
+        success: true,
+        data: sosAlert
+      });
+    } catch (error: any) {
+      console.error('Get SOS by ID error:', error);
+      return res.status(500).json({ success: false, message: error.message || 'Failed to get SOS alert' });
     }
   }
 }
+
+export default SOSController;

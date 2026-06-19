@@ -1,22 +1,22 @@
-// src/middleware/devAuth.ts
 import { Request, Response, NextFunction } from 'express';
+import { AuthRequest } from './auth.middleware';
 
-// Development otp bypass for testing
-export const devotp = (req: Request, res: Response, next: NextFunction) => {
+// Development OTP bypass for testing
+export const devOTP = (req: AuthRequest, res: Response, next: NextFunction): void => {
   // Only allow in development mode
-  if (process.env.NODE_ENV === 'development' || process.env.otp_ENV === 'dev') {
+  if (process.env.NODE_ENV === 'development' || process.env.OTP_ENV === 'dev') {
     const { otp, phone } = req.body;
     
-    // Allow specific test otps for development
-    const devotps = [
+    // Allow specific test OTPs for development
+    const devOTPs = [
       '123456', 
       '000000', 
       '111111', 
-      process.env.DEV_otp || '123456'
+      process.env.DEV_OTP || '123456'
     ];
     
-    if (devotps.includes(otp)) {
-      console.log('🔧 Development otp bypass activated');
+    if (devOTPs.includes(otp)) {
+      console.log('🔧 Development OTP bypass activated');
       req.body.devVerified = true;
       return next();
     }
@@ -41,18 +41,18 @@ export const devotp = (req: Request, res: Response, next: NextFunction) => {
 
 // Check if request is from development environment
 export const isDevEnvironment = (): boolean => {
-  return process.env.NODE_ENV === 'development' || process.env.otp_ENV === 'dev';
+  return process.env.NODE_ENV === 'development' || process.env.OTP_ENV === 'dev';
 };
 
-// Get development otp for testing
-export const getDevotp = (): string => {
-  return process.env.DEV_otp || '123456';
+// Get development OTP for testing
+export const getDevOTP = (): string => {
+  return process.env.DEV_OTP || '123456';
 };
 
-// Log otp requests in development
-export const logotpRequest = (req: Request, res: Response, next: NextFunction) => {
+// Log OTP requests in development
+export const logOTPRequest = (req: Request, res: Response, next: NextFunction): void => {
   if (isDevEnvironment()) {
-    console.log(`📱 otp Request: ${req.method} ${req.path}`, {
+    console.log(`📱 OTP Request: ${req.method} ${req.path}`, {
       phone: req.body.phone,
       email: req.body.email,
       otp: req.body.otp ? '***' : undefined,
@@ -63,7 +63,7 @@ export const logotpRequest = (req: Request, res: Response, next: NextFunction) =
 };
 
 // Simple rate limiting middleware
-export const rateLimitotp = (maxRequests: number = 5, windowMs: number = 60000) => {
+export const rateLimitOTP = (maxRequests: number = 5, windowMs: number = 60000) => {
   const requests: Map<string, number[]> = new Map();
 
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -88,6 +88,24 @@ export const rateLimitotp = (maxRequests: number = 5, windowMs: number = 60000) 
     validTimestamps.push(now);
     requests.set(ip, validTimestamps);
     next();
-    return;
   };
+};
+
+// Development-only route protection
+export const requireDev = (req: Request, res: Response, next: NextFunction): void => {
+  if (!isDevEnvironment()) {
+    res.status(403).json({
+      success: false,
+      message: 'This endpoint is only available in development mode'
+    });
+    return;
+  }
+  next();
+};
+
+// Generate a test OTP for development
+export const generateDevOTP = (phone: string): string => {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  console.log(`🔧 Dev OTP generated for ${phone}: ${otp}`);
+  return otp;
 };

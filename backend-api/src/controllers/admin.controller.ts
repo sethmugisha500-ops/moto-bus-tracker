@@ -5,6 +5,72 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export class AdminController {
+    async deleteUser(req: AuthRequest, res: Response) {
+        try {
+            const { id } = req.params;
+            await prisma.user.update({ where: { id }, data: { isActive: false } });
+            return res.json({ success: true, message: "User deactivated" });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: "Failed to deactivate user" });
+        }
+    }
+    async activateUser(req: AuthRequest, res: Response) {
+        try {
+            const { id } = req.params;
+            await prisma.user.update({ where: { id }, data: { isActive: true } });
+            return res.json({ success: true, message: "User activated" });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: "Failed to activate user" });
+        }
+    }
+    async getUserRides(req: AuthRequest, res: Response) {
+        try {
+            const { userId } = req.params;
+            const rides = await prisma.ride.findMany({
+                where: { riderId: userId },
+                orderBy: { createdAt: "desc" }
+            });
+            return res.json({ success: true, data: rides });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: "Failed to get user rides" });
+        }
+    }
+    async getUserPayments(req: AuthRequest, res: Response) {
+        try {
+            const { userId } = req.params;
+            const payments = await prisma.payment.findMany({
+                where: { userId },
+                orderBy: { createdAt: "desc" }
+            });
+            return res.json({ success: true, data: payments });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: "Failed to get user payments" });
+        }
+    }
+    async getDriverById(req: AuthRequest, res: Response) {
+        try {
+            const { id } = req.params;
+            const driver = await prisma.driver.findUnique({
+                where: { id },
+                include: { user: true }
+            });
+            if (!driver) return res.status(404).json({ success: false, message: "Driver not found" });
+            return res.json({ success: true, data: driver });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: "Failed to get driver" });
+        }
+    }
+    async getAllPayments(req: AuthRequest, res: Response) {
+        try {
+            const payments = await prisma.payment.findMany({
+                orderBy: { createdAt: "desc" },
+                include: { user: true, ride: true }
+            });
+            return res.json({ success: true, data: payments });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: "Failed to get payments" });
+        }
+    }
   async getDashboardStats(req: Request, res: Response) {
     try {
       const totalUsers = await prisma.user.count();

@@ -44,6 +44,7 @@ model User {
   phone      String   @unique
   name       String
   email      String?
+  password   String
   role       UserRole @default(RIDER)
   isActive   Boolean  @default(true)
   isVerified Boolean  @default(false)

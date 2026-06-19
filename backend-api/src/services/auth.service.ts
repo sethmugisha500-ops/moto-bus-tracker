@@ -1,76 +1,70 @@
-// src/services/auth.service.ts
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import prisma from '../config/database';
-import redisClient from '../config/redis';
-import UserRepository from '../repositories/user.repository';
-
-const userRepo = new UserRepository();
+import { prisma } from '../prisma/client';
 
 export class AuthService {
-  async sendOTP(phone: string) {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Store otp in Redis with 10 min expiry
-    await redisClient.setex(`otp:${phone}`, 600, otp);
-    
-    console.log(`📱 otp for ${phone}: ${otp}`);
-    
-    return { otp, expiresIn: 600 };
-  }
+    async register(data: { phone: string; name: string; email?: string; password: string; role?: string }) {
+        const existingUser = await prisma.user.findUnique({
+            where: { phone: data.phone }
+        });
 
-  async verifyOTP(phone: string, otp: string) {
-    const storedotp = await redisClient.get(`otp:${phone}`);
-    
-    if (storedotp !== otp) {
-      throw new Error('Invalid otp');
+        if (existingUser) {
+            throw new Error('User already exists');
+        }
+
+        const hashedPassword = await bcrypt.hash(data.password, 10);
+
+        const user = await prisma.user.create({
+            data: {
+                phone: data.phone,
+                name: data.name,
+                email: data.email || null,
+                password: hashedPassword,
+                role: data.role as any || 'RIDER',
+                wallet: { create: { balance: 0 } }
+            }
+        });
+
+        const token = jwt.sign(
+            { userId: user.id, role: user.role },
+            process.env.JWT_SECRET as string,
+            { expiresIn: '7d' }
+        );
+
+        return { user, token };
     }
-    
-    let user = await userRepo.findByPhone(phone);
-    
-    if (!user) {
-      user = await userRepo.create({
-        phone,
-        name: `User_${phone.slice(-4)}`,
-      }) as any;
+
+    async login(identifier: string, password: string) {
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [{ phone: identifier }, { email: identifier }]
+            }
+        });
+
+        if (!user) {
+            throw new Error('Invalid credentials');
+        }
+
+        const isValidPassword = await bcrypt.compare(password, user.password);
+        if (!isValidPassword) {
+            throw new Error('Invalid credentials');
+        }
+
+        const token = jwt.sign(
+            { userId: user.id, role: user.role },
+            process.env.JWT_SECRET as string,
+            { expiresIn: '7d' }
+        );
+
+        return { user, token };
     }
 
-    if (!user) {
-      throw new Error('User profile account unavailable');
+    async getCurrentUser(userId: string) {
+        return prisma.user.findUnique({
+            where: { id: userId },
+            include: { wallet: true, driver: true }
+        });
     }
-    
-    const jwtSecret = (process.env.JWT_SECRET || 'motobus_secret_key') as string;
-    const jwtExpiry = (process.env.JWT_EXPIRES_IN || '7d');
-    
-    // Fixed: Standardizing parameter signatures to resolve sign parameter overloads
-    const token = jwt.sign(
-      { userId: user.id, role: user.role },
-      jwtSecret,
-      { expiresIn: jwtExpiry as any }
-    );
-    
-    await redisClient.del(`otp:${phone}`);
-    
-    // Cast 'as any' to satisfy the complex user/driver/wallet interface requirements directly
-    return { user: user as any, token };
-  }
-
-  async checkOTP(identifier: string, otp: string) {
-    const storedotp = await redisClient.get(`otp:${identifier}`);
-    if (!storedotp || storedotp !== otp) {
-      return { valid: false, remainingSeconds: 0 };
-    }
-    const ttl = await redisClient.ttl(`otp:${identifier}`);
-    return { valid: true, remainingSeconds: ttl };
-  }
-
-  async getDevOTP(phone: string) {
-    return await redisClient.get(`otp:${phone}`);
-  }
-
-  async getActiveOTPs(phone: string) {
-    const otp = await redisClient.get(`otp:${phone}`);
-    return otp ? [{ otp, type: 'VERIFICATION' }] : [];
-  }
 }
 
-export default AuthService;
+export const authService = new AuthService();

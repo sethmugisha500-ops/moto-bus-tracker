@@ -1,5 +1,4 @@
 import { Router } from 'express';
-
 const router = Router();
 
 // Send otp

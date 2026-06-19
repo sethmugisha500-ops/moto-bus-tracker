@@ -7,7 +7,7 @@ import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 
 // 1. Core authentication / OTP routes
-import authRoutes from './routes/auth';
+import authRoutes from './routes/auth.routes';
 import otpRoutes from './routes/otp';
 
 // 2. Wildcard namespace import to grab any named export inside buses

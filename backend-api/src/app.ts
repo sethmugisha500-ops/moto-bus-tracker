@@ -14,7 +14,7 @@ import otpRoutes from './routes/otp';
 import * as busesRoutesNamespace from './routes/buses'; 
 
 // 3. Exact matching paths based on your compiler logs
-import usersRoutes from './routes/';       
+import usersRoutes from './routes/users.routes';       
 import driversRoutes from './routes/driver.routes';   
 import ridersRoutes from './routes/rider.routes';     
 import adminRoutes from './routes/admin.routes'; 
@@ -139,21 +139,35 @@ io.on('connection', (socket) => {
   });
 });
 
-// Extract the correct Router fallback from the buses module namespace object
-const busesRouter = 
-  (busesRoutesNamespace as any).default || 
-  (busesRoutesNamespace as any).router || 
-  (busesRoutesNamespace as any).busesRouter || 
-  busesRoutesNamespace;
+/**
+ * Bulletproof helper function to safely pull out the executable Express Router 
+ * from any runtime module layout. Prevents 'Router.use() requires a middleware function' errors.
+ */
+const unwrapRouter = (moduleInstance: any) => {
+  if (!moduleInstance) return undefined;
+  if (typeof moduleInstance === 'function') return moduleInstance;
+  
+  return (
+    moduleInstance.default || 
+    moduleInstance.router || 
+    moduleInstance.authRoutes || 
+    moduleInstance.otpRoutes ||
+    moduleInstance.usersRoutes ||
+    moduleInstance.driversRoutes ||
+    moduleInstance.ridersRoutes ||
+    moduleInstance.adminRoutes ||
+    moduleInstance
+  );
+};
 
-// Mount Routes safely as pure middleware functions
-app.use('/api/otp', otpRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/buses', busesRouter);
-app.use('/api/users', usersRoutes);
-app.use('/api/drivers', driversRoutes);
-app.use('/api/riders', ridersRoutes);
-app.use('/api/admin', adminRoutes);
+// Mount Routes safely by wrapping each import variable
+app.use('/api/otp', unwrapRouter(otpRoutes));
+app.use('/api/auth', unwrapRouter(authRoutes));
+app.use('/api/buses', unwrapRouter(busesRoutesNamespace));
+app.use('/api/users', unwrapRouter(usersRoutes));
+app.use('/api/drivers', unwrapRouter(driversRoutes));
+app.use('/api/riders', unwrapRouter(ridersRoutes));
+app.use('/api/admin', unwrapRouter(adminRoutes));
 
 app.use((req, res) => {
   return res.status(404).json({

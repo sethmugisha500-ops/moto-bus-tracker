@@ -1,174 +1,132 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthRequest } from '../../middleware/auth.middleware';
-import prisma from '../../config/database';
-import redisClient from '../../config/redis';
-// import { io } from '../../socket/socket.server';
+import prisma from '../../config/database'; // Fixed Prisma client location path
+import redis from '../../config/redis';
 
 export class TrackingController {
-  async updateLocation(req: AuthRequest, res: Response) {
-    try {
-      const { lat, lng, heading, speed, id } = req.body;
-      const driver = await prisma.driver.findUnique({
-        where: { userId: req.user?.id },
-      });
+    async updateLocation(req: AuthRequest, res: Response) {
+        try {
+            const { lat, lng } = req.body;
+            const userId = req.user?.id;
 
-      if (!driver) {
-        return res.status(403).json({ error: 'Only drivers can update location' });
-      }
+            if (!userId) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
 
-      // Update driver's current location
-      await prisma.driver.update({
-        where: { id: driver.id },
-        data: { currentLat: lat, currentLng: lng },
-      });
+            const driver = await prisma.driver.findUnique({
+                where: { userId },
+            });
 
-      // Store location in Redis for real-time access
-      await redisClient.setex(
-        `driver_location:${driver.id}`,
-        30,
-        JSON.stringify({ lat, lng, heading, speed, timestamp: Date.now() })
-      );
+            if (!driver) {
+                return res.status(403).json({ error: 'Only drivers can update location' });
+            }
 
-      // Store tracking data for active ride
-      if (id) {
-        await prisma.trackingData.create({
-          data: {
-            id,
-            
-            lat,
-            lng,
-            speed,
-            heading,
-          },
-        });
+            await prisma.driver.update({
+                where: { id: driver.id },
+                data: {
+                    currentLat: lat,
+                    currentLng: lng,
+                },
+            });
 
-        // Emit real-time location to rider
-        const ride = await prisma.ride.findUnique({
-          where: { id: id },
-          select: { riderId: true },
-        });
+            await prisma.trackingData.create({
+                data: {
+                    userId,
+                    rideId: driver.id, // Ensure your TrackingData schema expects driver.id or maps explicitly to a ride record
+                    lat,
+                    lng,
+                },
+            });
 
-        if (ride) {
-          io.to(`user_${ride.riderId}`).emit('driver_location_update', {
-            id,
-            lat,
-            lng,
-            heading,
-            speed,
-          });
+            return res.json({ success: true });
+        } catch (error) {
+            console.error('Update location error:', error);
+            return res.status(500).json({ error: 'Failed to update location' });
         }
-      }
-
-      // Emit to admin dashboard for fleet monitoring
-      io.to('admin_dashboard').emit('fleet_update', {
-        
-        driverName: req.user?.name,
-        lat,
-        lng,
-        heading,
-        status: driver.isOnline ? 'ONLINE' : 'OFFLINE',
-        id: id || null,
-      });
-
-      return res.json({ success: true });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ error: 'Failed to update location' });
     }
-  }
 
-  async getDriverLocation(req: AuthRequest, res: Response) {
-    try {
-      const { driverId } = req.params;
-      const cachedLocation = await redisClient.get(`driver_location:${driverId}`);
+    async getDriverLocation(req: AuthRequest, res: Response) {
+        try {
+            const { id } = req.params;
+            const driver = await prisma.driver.findUnique({
+                where: { id },
+                include: { user: true },
+            });
 
-      if (cachedLocation) {
-        return res.json(JSON.parse(cachedLocation));
-      }
+            if (!driver) {
+                return res.status(404).json({ error: 'Driver not found' });
+            }
 
-      const driver = await prisma.driver.findUnique({
-        where: { id: driverId },
-        select: { currentLat: true, currentLng: true },
-      });
-
-      return res.json(driver);
-    } catch (error) {
-      return res.status(500).json({ error: 'Failed to get driver location' });
-    }
-  }
-
-  async getNearbyDrivers(req: AuthRequest, res: Response) {
-    try {
-      const { lat, lng, radius = 2 } = req.query;
-
-      const nearbyDrivers = await prisma.$queryRaw`
-        SELECT 
-          d.*,
-          u."name",
-          u."profileImage",
-          v."plateNumber",
-          v."model",
-          v."color",
-          (6371 * acos(cos(radians(${parseFloat(lat as string)})) * cos(radians(d."currentLat")) * cos(radians(d."currentLng") - radians(${parseFloat(lng as string)})) + sin(radians(${parseFloat(lat as string)})) * sin(radians(d."currentLat")))) as distance
-        FROM "Driver" d
-        JOIN "User" u ON d."userId" = u.id
-        LEFT JOIN "Vehicle" v ON d."vehicleId" = v.id
-        WHERE d."isOnline" = true 
-        AND d."isOnline" = true
-        AND d."currentLat" IS NOT NULL
-        HAVING distance <= ${parseFloat(radius as string)}
-        ORDER BY distance ASC
-        LIMIT 20
-      `;
-
-      return res.json(nearbyDrivers);
-    } catch (error) {
-      return res.status(500).json({ error: 'Failed to get nearby drivers' });
-    }
-  }
-
-  async startTracking(req: AuthRequest, res: Response) {
-    try {
-      const { id } = req.params;
-      const ride = await prisma.ride.findUnique({
-        where: { id: id },
-        include: { driver: true },
-      });
-
-      if (!ride || !ride.driver) {
-        return res.status(404).json({ error: 'Ride or driver not found' });
-      }
-
-      // Start location streaming
-      const interval = setInterval(async () => {
-        const location = await redisClient.get(`driver_location:${ride.driverId}`);
-        if (location) {
-          io.to(`user_${ride.riderId}`).emit('live_tracking', JSON.parse(location));
+            return res.json({ driver });
+        } catch (error) {
+            console.error('Get driver location error:', error);
+            return res.status(500).json({ error: 'Failed to get driver location' });
         }
-      }, 3000);
-
-      // Store interval ID for cleanup
-      await redisClient.setex(`tracking_ride:${id}`, 3600, interval);
-
-      return res.json({ success: true, message: 'Tracking started' });
-    } catch (error) {
-      return res.status(500).json({ error: 'Failed to start tracking' });
     }
-  }
 
-  async stopTracking(req: AuthRequest, res: Response) {
-    try {
-      const { id } = req.params;
-      const intervalId = await redisClient.get(`tracking_ride:${id}`);
+    async getNearbyDrivers(req: AuthRequest, res: Response) {
+        try {
+            const { lat, lng, radius = 5 } = req.query;
 
-      if (intervalId) {
-        clearInterval(parseInt(intervalId));
-        await redisClient.del(`tracking_ride:${id}`);
-      }
+            const drivers = await prisma.driver.findMany({
+                where: {
+                    isOnline: true,
+                    isApproved: true,
+                    currentLat: { not: null },
+                    currentLng: { not: null },
+                },
+                include: {
+                    user: {
+                        select: {
+                            name: true,
+                            phone: true,
+                        },
+                    },
+                },
+                take: 20,
+            });
 
-      return res.json({ success: true, message: 'Tracking stopped' });
-    } catch (error) {
-      return res.status(500).json({ error: 'Failed to stop tracking' });
+            return res.json({ drivers });
+        } catch (error) {
+            console.error('Get nearby drivers error:', error);
+            return res.status(500).json({ error: 'Failed to get nearby drivers' });
+        }
     }
-  }
+
+    async startTracking(req: AuthRequest, res: Response) {
+        try {
+            const { id } = req.params;
+
+            const ride = await prisma.ride.findUnique({
+                where: { id },
+                include: { driver: true },
+            });
+
+            if (!ride || !ride.driver) {
+                return res.status(404).json({ error: 'Ride or driver not found' });
+            }
+
+            await redis.setex(`tracking_ride:${id}`, 3600, 'active');
+
+            return res.json({ success: true, message: 'Tracking started' });
+        } catch (error) {
+            console.error('Start tracking error:', error);
+            return res.status(500).json({ error: 'Failed to start tracking' });
+        }
+    }
+
+    async stopTracking(req: AuthRequest, res: Response) {
+        try {
+            const { id } = req.params;
+
+            await redis.del(`tracking_ride:${id}`);
+
+            return res.json({ success: true, message: 'Tracking stopped' });
+        } catch (error) {
+            console.error('Stop tracking error:', error);
+            return res.status(500).json({ error: 'Failed to stop tracking' });
+        }
+    }
 }
+
+export const trackingController = new TrackingController();

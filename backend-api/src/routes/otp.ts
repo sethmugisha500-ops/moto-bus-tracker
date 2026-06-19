@@ -2,20 +2,22 @@
 import express, { Request, Response } from 'express';
 import { otpService } from '../services/otpService';
 import { devotp, isDevEnvironment, logotpRequest, rateLimitotp } from '../middleware/devAuth';
-import { prisma } from '../prisma/client';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 import redis from '../config/redis';
 import { z } from 'zod';
 
 const router = express.Router();
 
 // Validation schemas
-const sendotpSchema = z.object({
+const sendOTPSchema = z.object({
   phone: z.string().min(10).max(15).regex(/^\+?[0-9]+$/),
   email: z.string().email().optional(),
-  userId: z.enum(['LOGIN', 'RESET_PASSWORD', 'TWO_FACTOR']).default('VERIFICATION'),
+  userId: z.enum(['LOGIN', 'RESET_PASSWORD', 'TWO_FACTOR', 'VERIFICATION']).default('VERIFICATION'),
+  type: z.enum(['LOGIN', 'RESET_PASSWORD', 'TWO_FACTOR', 'VERIFICATION']).default('VERIFICATION'),
 });
 
-const verifyotpSchema = z.object({
+const verifyOTPSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional(),
   otp: z.string().length(6),
@@ -25,9 +27,9 @@ const verifyotpSchema = z.object({
 // Send otp
 router.post('/send', logotpRequest, rateLimitotp(5, 60000), async (req: Request, res: Response) => {
   try {
-    const validated = sendotpSchema.parse(req.body);
+    const validated = sendOTPSchema.parse(req.body);
     const { phone, email, userId, type } = validated;
-
+    
     // Clean phone number
     const cleanPhone = phone.trim();
 
@@ -37,14 +39,15 @@ router.post('/send', logotpRequest, rateLimitotp(5, 60000), async (req: Request,
     });
 
     if (existingUser && type === 'VERIFICATION') {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Phone number already registered. Please login instead.',
-        existing
+        existingUser
       });
+      return;
     }
 
-    const result = await otpService.sendotp(cleanPhone, email, userId, type);
+    const result = await otpService.sendOTP(cleanPhone, email, userId, type);
 
     const response: any = {
       success: true,
@@ -62,29 +65,32 @@ router.post('/send', logotpRequest, rateLimitotp(5, 60000), async (req: Request,
       console.log(`📱 Dev otp for ${cleanPhone}: ${result.otp}`);
     }
 
-    return res.json(response);
+    res.json(response);
+    return;
   } catch (error: any) {
     console.error('❌ otp send error:', error);
     
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Invalid request data',
-        errors: error.errors,
+        errors: error.issues, // Fixed: updated from errors to issues
       });
+      return;
     }
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error.message || 'Failed to send otp. Please try again.',
     });
+    return;
   }
 });
 
 // Verify otp
 router.post('/verify', logotpRequest, async (req: Request, res: Response) => {
   try {
-    const validated = verifyotpSchema.parse(req.body);
+    const validated = verifyOTPSchema.parse(req.body);
     const { phone, email, otp, name } = validated;
 
     // Check for development bypass
@@ -108,7 +114,7 @@ router.post('/verify', logotpRequest, async (req: Request, res: Response) => {
         console.log(`👤 Created dev user: ${user.id}`);
       }
 
-      return res.json({
+      res.json({
         success: true,
         message: 'otp verified (development mode)',
         verified: true,
@@ -121,17 +127,19 @@ router.post('/verify', logotpRequest, async (req: Request, res: Response) => {
           isVerified: user.isVerified,
         },
       });
+      return;
     }
 
     if (!phone && !email) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Phone or email is required',
       });
+      return;
     }
 
     const identifier = phone || email!;
-    const verification = await otpService.verifyotp(identifier, otp);
+    const verification = await otpService.verifyOTP(identifier, otp);
 
     if (verification.valid) {
       // Check if user exists, create if not
@@ -159,7 +167,7 @@ router.post('/verify', logotpRequest, async (req: Request, res: Response) => {
       // Generate JWT token for authentication
       const token = generateJWT(user!);
 
-      return res.json({
+      res.json({
         success: true,
         message: verification.message,
         verified: true,
@@ -173,28 +181,32 @@ router.post('/verify', logotpRequest, async (req: Request, res: Response) => {
         } : null,
         token: token,
       });
+      return;
     } else {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: verification.message,
         verified: false,
       });
+      return;
     }
   } catch (error: any) {
     console.error('❌ otp verify error:', error);
     
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Invalid request data',
-        errors: error.errors,
+        errors: error.issues, // Fixed: updated from errors to issues
       });
+      return;
     }
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: 'Failed to verify otp. Please try again.',
     });
+    return;
   }
 });
 
@@ -204,10 +216,11 @@ router.post('/resend', logotpRequest, rateLimitotp(3, 30000), async (req: Reques
     const { phone, email, userId, type = 'VERIFICATION' } = req.body;
 
     if (!phone) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Phone number is required',
       });
+      return;
     }
 
     // Check rate limiting
@@ -216,13 +229,14 @@ router.post('/resend', logotpRequest, rateLimitotp(3, 30000), async (req: Reques
     
     if (lastResend) {
       const ttl = await redis.ttl(rateLimitKey);
-      return res.status(429).json({
+      res.status(429).json({
         success: false,
         message: `Please wait ${ttl} seconds before requesting another otp`,
       });
+      return;
     }
 
-    const result = await otpService.sendotp(phone, email, userId, type);
+    const result = await otpService.sendOTP(phone, email, userId, type);
 
     // Set rate limit for resend (30 seconds)
     await redis.setex(rateLimitKey, 30, '1');
@@ -241,13 +255,15 @@ router.post('/resend', logotpRequest, rateLimitotp(3, 30000), async (req: Reques
       console.log(`📱 Dev otp (resend) for ${phone}: ${result.otp}`);
     }
 
-    return res.json(response);
+    res.json(response);
+    return;
   } catch (error: any) {
     console.error('❌ otp resend error:', error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error.message || 'Failed to resend otp',
     });
+    return;
   }
 });
 
@@ -257,61 +273,68 @@ router.post('/check', async (req: Request, res: Response) => {
     const { phone, email, otp } = req.body;
 
     if (!otp) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'otp is required',
       });
+      return;
     }
 
     const identifier = phone || email;
     if (!identifier) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Phone or email is required',
       });
+      return;
     }
 
-    const result = await otpService.checkotp(identifier, otp);
+    const result = await otpService.checkOTP(identifier, otp);
 
-    return res.json({
+    res.json({
       success: true,
       valid: result.valid,
       remainingSeconds: result.remainingSeconds,
       message: result.valid ? 'otp is valid' : 'otp is invalid or expired',
     });
+    return;
   } catch (error) {
     console.error('❌ Check otp error:', error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: 'Failed to check otp',
     });
+    return;
   }
 });
 
 // Get development otp
 router.get('/dev-otp/:phone', async (req: Request, res: Response) => {
   if (!isDevEnvironment()) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       message: 'Not found',
     });
+    return;
   }
 
   const { phone } = req.params;
-  const otp = await otpService.getDevotp(phone);
+  const otp = await otpService.getDevOTP(phone);
   
   if (otp) {
-    return res.json({
+    res.json({
       success: true,
       otp,
       phone,
       source: await redis.get(`otp:${phone}`) ? 'redis' : 'database',
     });
+    return;
   } else {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       message: 'No otp found for this phone number',
     });
+    return;
   }
 });
 
@@ -322,23 +345,26 @@ router.get('/active/:phone', async (req: Request, res: Response) => {
     
     // In production, require authentication
     if (!isDevEnvironment()) {
-      return res.status(403).json({
+      res.status(403).json({
         success: false,
         message: 'Access denied. Admin only.',
       });
+      return;
     }
 
-    const otps = await otpService.getActiveotps(phone);
-    return res.json({
+    const otps = await otpService.getActiveOTPs(phone);
+    res.json({
       success: true,
       otps,
     });
+    return;
   } catch (error) {
     console.error('❌ Get active otps error:', error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: 'Failed to get active otps',
     });
+    return;
   }
 });
 
@@ -352,7 +378,7 @@ function generateJWT(user: any): string {
       email: user.email,
       role: user.role,
     },
-    process.env.JWT_SECRET as string as string || 'motobus_secret_key',
+    (process.env.JWT_SECRET as string) || 'motobus_secret_key',
     {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     }

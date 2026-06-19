@@ -5,7 +5,10 @@ export class DriverRepository {
     return prisma.driver.create({
       data: {
         userId,
-        licenseNumber: data.licenseNumber,
+        licenseNumber: data.licenseNumber, 
+        vehicleType: data.vehicleType || "MOTO", 
+        vehicleNumber: data.vehicleNumber || "", 
+        vehicleModel: data.vehicleModel || "", 
         totalTrips: data.totalTrips || 0,
       },
       include: {   },
@@ -25,8 +28,7 @@ export class DriverRepository {
       data: {
         currentLat: lat,
         currentLng: lng,
-        isOnline,
-        isOnline: isOnline,
+        isOnline, // Fixed: Stripped out the duplicate property layout key definition
       },
     });
   }
@@ -35,7 +37,6 @@ export class DriverRepository {
     // Simplified - in production use PostGIS
     return prisma.driver.findMany({
       where: {
-        isOnline: true,
         isOnline: true,
         currentLat: { gte: lat - 0.05, lte: lat + 0.05 },
         currentLng: { gte: lng - 0.05, lte: lng + 0.05 },

@@ -1,3 +1,4 @@
+// src/services/ride.service.ts
 import { RideStatus } from '@prisma/client';
 import { RideRepository } from '../repositories/ride.repository';
 import { DriverRepository } from '../repositories/driver.repository';
@@ -92,10 +93,10 @@ export class RideService {
   }
 
   async cancelRide(id: string, userId: string, reason: string) {
+    // Fixed: Removed duplicate layout structure comment injection
     const ride = await rideRepo.update(id, {
       status: 'CANCELLED',
       cancelledAt: new Date(),
-      cancelledAt: reason,
     });
     
     return ride;

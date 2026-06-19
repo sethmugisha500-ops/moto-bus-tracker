@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/database';
 import flutterwaveService from '../services/Flutterwave.service';
-import PaymentRepository from '../repositories/payment.repository';
+import { PaymentRepository } from '../repositories/payment.repository';
 
 const paymentRepo = new PaymentRepository();
 
@@ -14,7 +14,7 @@ export class PaymentController {
       const userId = req.user!.id;
 
       const ride = await prisma.ride.findUnique({
-        where: { id: id },
+        where: { id },
         include: { rider: true },
       });
 
@@ -41,12 +41,12 @@ export class PaymentController {
 
       // Save payment record
       await paymentRepo.create({
-        id: ride.id,
+        rideId: ride.id,
         userId: user.id,
         amount: ride.fare,
-        method: paymentMethod === 'mobile_money' ? 'MOBILE_MONEY' : 'CARD',
+        method: paymentMethod === 'mobile_money' ? 'MOBILE_MONEY' : 'CASH',
         status: 'PENDING',
-        transactionId: payment.data?.id?.toString(),
+        transactionId: payment.data?.tx_ref || '',
       });
 
       return res.json({
@@ -78,7 +78,7 @@ export class PaymentController {
           
           // Update ride payment status
           await prisma.ride.update({
-            where: { id: payment.id },
+            where: { id: payment.rideId },
             data: { paymentStatus: 'COMPLETED' },
           });
 
@@ -100,9 +100,9 @@ export class PaymentController {
         }
 
         // Redirect to success page
-        res.redirect(`${process.env.FRONTEND_URL}/payment/success?ref=${tx_ref}`);
+        return res.redirect(`${process.env.FRONTEND_URL}/payment/success?ref=${tx_ref}`);
       } else {
-        res.redirect(`${process.env.FRONTEND_URL}/payment/failed?ref=${tx_ref}`);
+        return res.redirect(`${process.env.FRONTEND_URL}/payment/failed?ref=${tx_ref}`);
       }
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
@@ -112,12 +112,18 @@ export class PaymentController {
   // Driver withdrawal request
   async requestWithdrawal(req: AuthRequest, res: Response) {
     try {
-      const { amount,  } = req.body;
+      const { amount } = req.body;
       const userId = req.user!.id;
 
       const driver = await prisma.driver.findUnique({
         where: { userId },
-        include: {  },
+        include: {
+          user: {
+            include: {
+              wallet: true,
+            },
+          },
+        },
       });
 
       if (!driver) {
@@ -131,7 +137,7 @@ export class PaymentController {
       // Initiate withdrawal via Flutterwave
       const withdrawal = await flutterwaveService.initiateWithdrawal({
         amount: amount,
-        phoneNumber: driver?.user?.phone || "",
+        phoneNumber: driver.user.phone || "",
         email: driver.user.email || `${driver.user.phone}@motobus.rw`,
         name: driver.user.name,
         narration: `Driver earnings withdrawal - ${driver.user.name}`,
@@ -144,20 +150,26 @@ export class PaymentController {
           data: { totalEarnings: { decrement: amount } },
         });
 
-        // Create withdrawal record
-        const transaction = await prisma.transaction.create({
-          data: {
-            walletId: driver.user.wallet?.id || '',
-            amount: -amount,
-description: `Withdrawal to ${driver?.user?.phone || ''}`,            status: 'COMPLETED',
-          },
-        });
+        // Create withdrawal record mapping relation via connect
+        if (driver.user.wallet) {
+          const transaction = await prisma.transaction.create({
+            data: {
+              wallet: { connect: { id: driver.user.wallet.id } },
+              type: 'WITHDRAWAL',
+              amount: -amount,
+              description: `Withdrawal to ${driver.user.phone || ''}`,
+              status: 'COMPLETED',
+            },
+          });
 
-        return res.json({
-          success: true,
-          message: 'Withdrawal processed successfully',
-          transaction,
-        });
+          return res.json({
+            success: true,
+            message: 'Withdrawal processed successfully',
+            transaction,
+          });
+        } else {
+          return res.status(400).json({ success: false, message: 'Wallet not configured for this account' });
+        }
       } else {
         return res.status(400).json({
           success: false,
@@ -206,7 +218,6 @@ description: `Withdrawal to ${driver?.user?.phone || ''}`,            status: 'C
       return res.json({
         success: true,
         balance: wallet.balance,
-        currency: wallet.currency,
         transactions: wallet.transactions,
         earnings,
       });
@@ -233,11 +244,11 @@ description: `Withdrawal to ${driver?.user?.phone || ''}`,            status: 'C
 
       const transaction = await prisma.transaction.create({
         data: {
-          walletId: wallet.id,
+          wallet: { connect: { id: wallet.id } },
           amount: amount,
+          type: 'TOPUP',
           description: `Wallet top-up via ${paymentMethod || 'Mobile Money'}`,
           reference: `TOPUP-${Date.now()}`,
-          paymentMethod: paymentMethod === 'mobile_money' ? 'MOBILE_MONEY' : 'CASH',
           status: 'COMPLETED',
         },
       });
@@ -263,7 +274,7 @@ description: `Withdrawal to ${driver?.user?.phone || ''}`,            status: 'C
         include: {
           ride: {
             include: {
-              driver: { include: {  } },
+              driver: true,
             },
           },
         },
@@ -286,7 +297,7 @@ description: `Withdrawal to ${driver?.user?.phone || ''}`,            status: 'C
       const userId = req.user!.id;
 
       const ride = await prisma.ride.findUnique({
-        where: { id: id },
+        where: { id },
       });
 
       if (!ride) {
@@ -295,7 +306,7 @@ description: `Withdrawal to ${driver?.user?.phone || ''}`,            status: 'C
 
       if (success) {
         const payment = await paymentRepo.create({
-          id: ride.id,
+          rideId: ride.id,
           userId,
           amount: ride.fare,
           method: 'CASH',

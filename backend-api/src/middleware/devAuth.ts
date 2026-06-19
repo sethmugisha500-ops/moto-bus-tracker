@@ -66,7 +66,7 @@ export const logotpRequest = (req: Request, res: Response, next: NextFunction) =
 export const rateLimitotp = (maxRequests: number = 5, windowMs: number = 60000) => {
   const requests: Map<string, number[]> = new Map();
 
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const now = Date.now();
     
@@ -78,14 +78,16 @@ export const rateLimitotp = (maxRequests: number = 5, windowMs: number = 60000) 
     const validTimestamps = timestamps.filter(t => now - t < windowMs);
     
     if (validTimestamps.length >= maxRequests) {
-      return res.status(429).json({
+      res.status(429).json({
         success: false,
         message: `Too many requests. Please wait ${Math.ceil(windowMs / 60000)} minute(s).`,
       });
+      return;
     }
 
     validTimestamps.push(now);
     requests.set(ip, validTimestamps);
     next();
+    return;
   };
 };

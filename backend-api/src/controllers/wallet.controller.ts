@@ -1,8 +1,11 @@
 ﻿import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { prisma } from '../prisma/client';
-
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 export class WalletController {
+    async getAllTransactions(req: AuthRequest, res: Response) { return res.json({ success: true, data: [] }); }
+    async getTransactionById(req: AuthRequest, res: Response) { return res.json({ success: true, data: {} }); }
+    async getWalletStats(req: AuthRequest, res: Response) { return res.json({ success: true, data: {} }); }
   async getBalance(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;

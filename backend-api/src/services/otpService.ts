@@ -1,4 +1,4 @@
-﻿import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import redis from '../config/redis';
 import twilio from 'twilio';
 import nodemailer from 'nodemailer';

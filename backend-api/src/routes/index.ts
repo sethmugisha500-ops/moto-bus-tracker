@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import authController from '../controllers/auth.controller';
-import rideController from '../controllers/ride.controller';
-import walletController from '../controllers/wallet.controller';
+import { rideController } from '../controllers/ride.controller';
+import { walletController } from '../controllers/wallet.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import paymentRoutes from '../routes/payment.routes';
 
@@ -13,38 +13,38 @@ router.post('/auth/login', authController.login.bind(authController));
 router.post('/auth/refresh', authController.refreshToken.bind(authController));
 router.post('/auth/forgot-password', authController.forgotpassword.bind(authController));
 router.post('/auth/reset-password', authController.resetPassword.bind(authController));
-router.get('/auth/me', authenticate, authController.getCurrentUser.bind(authController));
-router.put('/auth/profile', authenticate, authController.updateProfile.bind(authController));
-router.post('/auth/change-password', authenticate, authController.changePassword.bind(authController));
-router.post('/auth/logout', authenticate, authController.logout.bind(authController));
+router.get('/auth/me', authenticate as any, authController.getCurrentUser.bind(authController));
+router.put('/auth/profile', authenticate as any, authController.updateProfile.bind(authController));
+router.post('/auth/change-password', authenticate as any, authController.changePassword.bind(authController));
+router.post('/auth/logout', authenticate as any, authController.logout.bind(authController));
 
 // Admin routes
-router.get('/admin/users', authenticate, authorize('ADMIN'), authController.getAllUsers.bind(authController));
-router.get('/admin/rides', authenticate, authorize('ADMIN'), rideController.getAllRides.bind(rideController));
-router.get('/admin/transactions', authenticate, authorize('ADMIN'), walletController.getAllTransactions.bind(walletController));
+router.get('/admin/users', authenticate as any, authorize('ADMIN') as any, authController.getAllUsers.bind(authController));
+router.get('/admin/rides', authenticate as any, authorize('ADMIN') as any, rideController.getAllRides.bind(rideController));
+router.get('/admin/transactions', authenticate as any, authorize('ADMIN') as any, walletController.getAllTransactions.bind(walletController));
 
 // ============ USER ROUTES ============
-router.get('/users/:id', authenticate, authController.getUserById.bind(authController));
-router.get('/users/:userId/rides', authenticate, rideController.getUserRides.bind(rideController));
+router.get('/users/:id', authenticate as any, authController.getUserById.bind(authController));
+router.get('/users/:userId/rides', authenticate as any, rideController.getUserRides.bind(rideController));
 
 // ============ RIDE ROUTES ============
-router.post('/rides', authenticate, rideController.createRide.bind(rideController));
-router.get('/rides', authenticate, rideController.getUserRides.bind(rideController));
-router.get('/rides/:id', authenticate, rideController.getRideById.bind(rideController));
-router.post('/rides/:id/accept', authenticate, authorize('DRIVER'), rideController.acceptRide.bind(rideController));
-router.post('/rides/:id/start', authenticate, authorize('DRIVER'), rideController.startRide.bind(rideController));
-router.post('/rides/:id/complete', authenticate, authorize('DRIVER'), rideController.completeRide.bind(rideController));
-router.post('/rides/:id/cancel', authenticate, rideController.cancelRide.bind(rideController));
-router.post('/rides/:id/rate', authenticate, rideController.rateRide.bind(rideController));
-router.get('/rides/stats/summary', authenticate, rideController.getRideStats.bind(rideController));
-router.get('/driver/rides', authenticate, authorize('DRIVER'), rideController.getDriverRides.bind(rideController));
+router.post('/rides', authenticate as any, rideController.createRide.bind(rideController));
+router.get('/rides', authenticate as any, rideController.getUserRides.bind(rideController));
+router.get('/rides/:id', authenticate as any, rideController.getRideById.bind(rideController));
+router.post('/rides/:id/accept', authenticate as any, authorize('DRIVER') as any, rideController.acceptRide.bind(rideController));
+router.post('/rides/:id/start', authenticate as any, authorize('DRIVER') as any, rideController.startRide.bind(rideController));
+router.post('/rides/:id/complete', authenticate as any, authorize('DRIVER') as any, rideController.completeRide.bind(rideController));
+router.post('/rides/:id/cancel', authenticate as any, rideController.cancelRide.bind(rideController));
+router.post('/rides/:id/rate', authenticate as any, rideController.rateRide.bind(rideController));
+router.get('/rides/stats/summary', authenticate as any, rideController.getRideStats.bind(rideController));
+router.get('/driver/rides', authenticate as any, authorize('DRIVER') as any, rideController.getDriverRides.bind(rideController));
 
 // ============ WALLET ROUTES ============
-router.get('/wallet/balance', authenticate, walletController.getBalance.bind(walletController));
-router.post('/wallet/topup', authenticate, walletController.topUp.bind(walletController));
-router.post('/wallet/withdraw', authenticate, authorize('DRIVER'), walletController.withdraw.bind(walletController));
-router.get('/wallet/transactions', authenticate, walletController.getTransactions.bind(walletController));
-router.get('/wallet/transactions/:id', authenticate, walletController.getTransactionById.bind(walletController));
-router.get('/wallet/stats', authenticate, walletController.getWalletStats.bind(walletController));
+router.get('/wallet/balance', authenticate as any, walletController.getBalance.bind(walletController));
+router.post('/wallet/topup', authenticate as any, walletController.topUp.bind(walletController));
+router.post('/wallet/withdraw', authenticate as any, authorize('DRIVER') as any, walletController.withdraw.bind(walletController));
+router.get('/wallet/transactions', authenticate as any, walletController.getTransactions.bind(walletController));
+router.get('/wallet/transactions/:id', authenticate as any, walletController.getTransactionById.bind(walletController));
+router.get('/wallet/stats', authenticate as any, walletController.getWalletStats.bind(walletController));
 
 export default router;

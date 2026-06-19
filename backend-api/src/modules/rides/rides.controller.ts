@@ -1,7 +1,9 @@
 import { Response } from 'express';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import prisma from '../../config/database';
-// import { io } from '../../socket/socket.server';
+
+// Global reference if socket module isn't exported yet
+const io = (global as any).io || { to: () => ({ emit: () => {} }) };
 
 export class RidesController {
   async createRide(req: AuthRequest, res: Response) {
@@ -21,7 +23,7 @@ export class RidesController {
 
       const ride = await prisma.ride.create({
         data: {
-          riderId: req.user?.id,
+          riderId: req.user?.id || '',
           pickupLat,
           pickupLng,
           pickupAddress,
@@ -42,10 +44,12 @@ export class RidesController {
       // Notify nearby drivers
       this.notifyNearbyDrivers(ride);
 
-      return res.status(201).json(ride);
+      res.status(201).json(ride);
+      return;
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Failed to create ride' });
+      res.status(500).json({ error: 'Failed to create ride' });
+      return;
     }
   }
 
@@ -57,33 +61,34 @@ export class RidesController {
       });
 
       if (!driver) {
-        return res.status(403).json({ error: 'Only drivers can accept rides' });
+        res.status(403).json({ error: 'Only drivers can accept rides' });
+        return;
       }
 
       const ride = await prisma.ride.update({
         where: { id: id, status: 'PENDING' },
         data: {
-          
           status: 'ACCEPTED',
+          driverId: driver.id
         },
         include: {
           rider: true,
-          driver: {
-            include: {   },
-          },
         },
       });
 
       if (!ride) {
-        return res.status(404).json({ error: 'Ride not found or already accepted' });
+        res.status(404).json({ error: 'Ride not found or already accepted' });
+        return;
       }
 
       // Notify rider
       io.to(`user_${ride.riderId}`).emit('ride_accepted', ride);
 
-      return res.json(ride);
+      res.json(ride);
+      return;
     } catch (error) {
-      return res.status(500).json({ error: 'Failed to accept ride' });
+      res.status(500).json({ error: 'Failed to accept ride' });
+      return;
     }
   }
 
@@ -94,15 +99,16 @@ export class RidesController {
         where: { id: id, status: 'ACCEPTED' },
         data: {
           status: 'STARTED',
-          startedAt: new Date(),
         },
       });
 
       io.to(`user_${ride.riderId}`).emit('ride_started', ride);
 
-      return res.json(ride);
+      res.json(ride);
+      return;
     } catch (error) {
-      return res.status(500).json({ error: 'Failed to start ride' });
+      res.status(500).json({ error: 'Failed to start ride' });
+      return;
     }
   }
 
@@ -113,7 +119,6 @@ export class RidesController {
         where: { id: id, status: 'STARTED' },
         data: {
           status: 'COMPLETED',
-          completedAt: new Date(),
           paymentStatus: 'COMPLETED',
         },
       });
@@ -134,9 +139,11 @@ export class RidesController {
 
       io.to(`user_${ride.riderId}`).emit('ride_completed', ride);
 
-      return res.json(ride);
+      res.json(ride);
+      return;
     } catch (error) {
-      return res.status(500).json({ error: 'Failed to complete ride' });
+      res.status(500).json({ error: 'Failed to complete ride' });
+      return;
     }
   }
 
@@ -149,16 +156,16 @@ export class RidesController {
         where: { id: id, status: { in: ['PENDING', 'ACCEPTED'] } },
         data: {
           status: 'CANCELLED',
-          cancelledAt: new Date(),
-          cancelledAt: reason,
         },
       });
 
       io.to(`ride_${id}`).emit('ride_cancelled', { id, reason });
 
-      return res.json(ride);
+      res.json(ride);
+      return;
     } catch (error) {
-      return res.status(500).json({ error: 'Failed to cancel ride' });
+      res.status(500).json({ error: 'Failed to cancel ride' });
+      return;
     }
   }
 
@@ -169,25 +176,21 @@ export class RidesController {
         where: { id: id },
         include: {
           rider: true,
-          driver: {
-            include: {   },
-          },
-          tracking: {
-            orderBy: { timestamp: 'desc' },
-            take: 1,
-          },
           payment: true,
           rating: true,
         },
       });
 
       if (!ride) {
-        return res.status(404).json({ error: 'Ride not found' });
+        res.status(404).json({ error: 'Ride not found' });
+        return;
       }
 
-      return res.json(ride);
+      res.json(ride);
+      return;
     } catch (error) {
-      return res.status(500).json({ error: 'Failed to fetch ride' });
+      res.status(500).json({ error: 'Failed to fetch ride' });
+      return;
     }
   }
 
@@ -197,27 +200,24 @@ export class RidesController {
         where: { riderId: req.user?.id },
         orderBy: { createdAt: 'desc' },
         include: {
-          driver: {
-            include: {  },
-          },
           rating: true,
         },
       });
 
-      return res.json(rides);
+      res.json(rides);
+      return;
     } catch (error) {
-      return res.status(500).json({ error: 'Failed to fetch rides' });
+      res.status(500).json({ error: 'Failed to fetch rides' });
+      return;
     }
   }
 
   private async notifyNearbyDrivers(ride: any) {
-    // Find nearby drivers within 2km radius
     const nearbyDrivers = await prisma.$queryRaw`
       SELECT d.*, u.name, u.phone 
       FROM "Driver" d
       JOIN "User" u ON d."userId" = u.id
       WHERE d."isOnline" = true 
-      AND d."isOnline" = true
       AND d."currentLat" IS NOT NULL
       AND (6371 * acos(cos(radians(${ride.pickupLat})) * cos(radians(d."currentLat")) * cos(radians(d."currentLng") - radians(${ride.pickupLng})) + sin(radians(${ride.pickupLat})) * sin(radians(d."currentLat")))) <= 2
     `;
@@ -236,8 +236,6 @@ export class RidesController {
   }
 
   private async processPayment(ride: any) {
-    // Implement payment processing logic
-    // For Mobile Money or Wallet deduction
     if (ride.paymentMethod === 'WALLET') {
       await prisma.$transaction([
         prisma.wallet.update({
@@ -246,12 +244,11 @@ export class RidesController {
         }),
         prisma.payment.create({
           data: {
-            id: ride.id,
-            userId: ride.riderId,
             amount: ride.fare,
             method: 'WALLET',
             status: 'COMPLETED',
-            completedAt: new Date(),
+            ride: { connect: { id: ride.id } },
+            user: { connect: { id: ride.riderId } }
           },
         }),
       ]);

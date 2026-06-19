@@ -1,8 +1,9 @@
+// src/simple-server.ts
 import express from 'express';
 import cors from 'cors';
 
 const app = express();
-const PORT = 5000;  // Changed to 5000
+const PORT = 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -25,7 +26,6 @@ app.post('/api/auth/send-otp', (req, res) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   console.log(`📱 otp for ${phone}: ${otp}`);
 
-  // Return the response to ensure all code paths return a value
   return res.json({ 
     success: true, 
     message: 'otp sent successfully',
@@ -35,37 +35,37 @@ app.post('/api/auth/send-otp', (req, res) => {
 
 // Verify otp
 app.post('/api/auth/verify-otp', (req, res) => {
-    const { phone, otp } = req.body;
+  const { phone, otp } = req.body;
 
-    if (!phone || !otp) {
-      return res.status(400).json({ success: false, message: 'Phone and otp required' });
+  if (!phone || !otp) {
+    return res.status(400).json({ success: false, message: 'Phone and otp required' });
+  }
+
+  // Accept any 6-digit otp for testing
+  if (otp.length === 6) {
+    const token = Buffer.from(JSON.stringify({ userId: Date.now(), phone })).toString('base64');
+
+    // Check if user exists, if not create
+    let user = users.find(u => u.phone === phone);
+    if (!user) {
+      user = { id: Date.now().toString(), phone, name: `User_${phone.slice(-4)}`, role: 'rider' };
+      users.push(user);
     }
 
-    // Accept any 6-digit otp for testing
-    if (otp.length === 6) {
-      const token = Buffer.from(JSON.stringify({ userId: Date.now(), phone })).toString('base64');
-
-      // Check if user exists, if not create
-      let user = users.find(u => u.phone === phone);
-      if (!user) {
-        user = { id: Date.now().toString(), phone, name: `User_${phone.slice(-4)}`, role: 'rider' };
-        users.push(user);
-      }
-
-      return res.json({
-        success: true,
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          phone: user.phone,
-          role: user.role,
-        },
-      });
-    } else {
-      return res.status(400).json({ success: false, message: 'Invalid otp' });
-    }
-  });
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        phone: user.phone,
+        role: user.role,
+      },
+    });
+  } else {
+    return res.status(400).json({ success: false, message: 'Invalid otp' });
+  }
+});
 
 // ============ RIDER ENDPOINTS ============
 
@@ -74,8 +74,8 @@ app.get('/api/riders/nearby-drivers', (req, res) => {
   return res.json({
     success: true,
     drivers: [
-      { id: '1', name: 'John Mugabo', vehicle, rating: 4.8, distance: '300m', eta: '2 min' },
-      { id: '2', name: 'Peter Nshuti', vehicle, rating: 4.9, distance: '500m', eta: '3 min' },
+      { id: '1', name: 'John Mugabo', vehicleType: "MOTO", vehicleNumber: 'MT-001A', rating: 4.8, distance: '300m', eta: '2 min' },
+      { id: '2', name: 'Peter Nshuti', vehicleType: "MOTO", vehicleNumber: 'MT-002B', rating: 4.9, distance: '500m', eta: '3 min' },
     ],
   });
 });
@@ -152,13 +152,13 @@ app.listen(PORT, '0.0.0.0', () => {
 ║  Server running on: http://localhost:${PORT}                  ║
 ║  Health: http://localhost:${PORT}/health                      ║
 ║                                                              ║
-║  Test otp: 123456                                           ║
+║  Test otp: 123456                                            ║
 ║                                                              ║
-║  Endpoints:                                                 ║
-║    POST /api/auth/send-otp                                  ║
-║    POST /api/auth/verify-otp                                ║
-║    GET  /api/riders/nearby-drivers                          ║
-║    POST /api/riders/request-ride                            ║
+║  Endpoints:                                                  ║
+║    POST /api/auth/send-otp                                   ║
+║    POST /api/auth/verify-otp                                 ║
+║    GET  /api/riders/nearby-drivers                           ║
+║    POST /api/riders/request-ride                             ║
 ╚══════════════════════════════════════════════════════════════╝
   `);
 });

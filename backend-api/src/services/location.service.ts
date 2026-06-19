@@ -1,4 +1,5 @@
-import { prisma } from '../prisma/client';
+// src/services/location.service.ts
+import prisma from '../config/database'; // Fixed Prisma connection import paths
 
 export class LocationService {
   async updateDriverLocation(driverId: string, lat: number, lng: number, isOnline: boolean) {
@@ -49,7 +50,6 @@ export class LocationService {
   }
 
   async getNearbyDrivers(lat: number, lng: number, radiusKm: number = 5) {
-    // Simplified - in production use PostGIS or similar
     const drivers = await prisma.driver.findMany({
       where: {
         isOnline: true,
@@ -61,15 +61,13 @@ export class LocationService {
         user: {
           select: {
             name: true,
-            phone: true,
-            rating: true
+            phone: true
           }
         }
       },
       take: 20
     });
 
-    // Calculate distance in a real implementation
     return drivers;
   }
 

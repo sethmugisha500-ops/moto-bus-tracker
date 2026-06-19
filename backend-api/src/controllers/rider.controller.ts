@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { RideService } from '../services/ride.service';
 import { LocationService } from '../services/location.service';
 import prisma from '../config/database';
-
+import { VehicleType } from '@prisma/client';
 const rideService = new RideService();
 const locationService = new LocationService();
 
@@ -31,26 +31,23 @@ export class RiderController {
       const drivers = await prisma.driver.findMany({
         where: {
           isOnline: true,
-          isOnline: true,
           isApproved: true,
           currentLat: { gte: Number(lat) - 0.05, lte: Number(lat) + 0.05 },
           currentLng: { gte: Number(lng) - 0.05, lte: Number(lng) + 0.05 },
-          ...(vehicleType && {  }),
+          ...(vehicleType ? { vehicleType: (vehicleType as string) as VehicleType } : {}),
         },
         include: {
-          
-          
+          user: true,
         },
         take: 20,
       });
 
       const formattedDrivers = drivers.map(driver => ({
         id: driver.id,
-        name: driver.user.name,
-        vehicle,
-        vehicleNumber: driver.vehicle?.plateNumber,
+        name: (driver as any).user?.name || '',
+        vehicleNumber: driver.vehicleNumber || '',
         rating: driver.rating,
-        distance: '500m', // Calculate actual distance
+        distance: '500m',
         eta: '3 min',
       }));
 
@@ -70,7 +67,7 @@ export class RiderController {
         prisma.ride.findMany({
           where: { riderId: userId },
           include: {
-            driver: { include: {   } },
+            driver: { include: {} },
             rating: true,
             payment: true,
           },
@@ -104,7 +101,7 @@ export class RiderController {
       const ride = await prisma.ride.findFirst({
         where: { id, riderId: userId },
         include: {
-          driver: { include: {   } },
+          driver: { include: {} },
           locations: { orderBy: { timestamp: 'asc' } },
           payment: true,
           rating: true,
@@ -145,11 +142,11 @@ export class RiderController {
 
       const newRating = await prisma.rating.create({
         data: {
-          id,
-          riderId: userId,
+          rideId: ride.id, // Fixed: Added mandatory schema relation property link
+          riderId: userId, // Fixed: Stripped duplicate, broken riderId references
           driverId: ride.driverId!,
-          rating,
-          comment,
+          rating: Number(rating), 
+          comment: comment || '',
         },
       });
 

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { otpService } from '../services/otpService';
-import { prisma } from '../prisma/client';
-
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 export class OTPController {
   async sendOTP(req: Request, res: Response) {
     try {

@@ -40,7 +40,7 @@ class AuthController {
 
       // Validation
       if (!phone || !name || !password) {
-        return res.status(400).json({
+     res.status(400).json({
           success: false,
           error: 'Phone, full name and password are required'
         });
@@ -50,7 +50,7 @@ class AuthController {
       // Check if user exists
       const existingUser = users.find(u => u.phone === phone);
       if (existingUser) {
-        return res.status(400).json({
+         res.status(400).json({
           success: false,
           error: 'User already exists with this phone number'
         });
@@ -86,7 +86,7 @@ class AuthController {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
 
-      return res.status(201).json({
+       res.status(201).json({
         success: true,
         message: 'Registration successful',
         data: {
@@ -97,7 +97,7 @@ class AuthController {
       });
     } catch (error) {
       console.error('Register error:', error);
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -110,7 +110,7 @@ class AuthController {
       const { phone, password } = req.body;
 
       if (!phone || !password) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Phone and password are required'
         });
@@ -120,7 +120,7 @@ class AuthController {
       // Find user
       const user = users.find(u => u.phone === phone);
       if (!user) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'Invalid credentials'
         });
@@ -130,7 +130,7 @@ class AuthController {
       // Verify password
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
-        return res.status(401).json({
+         res.status(401).json({
           success: false,
           error: 'Invalid credentials'
         });
@@ -144,7 +144,7 @@ class AuthController {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
 
-      return res.json({
+       res.json({
         success: true,
         message: 'Login successful',
         data: {
@@ -155,7 +155,7 @@ class AuthController {
       });
     } catch (error) {
       console.error('Login error:', error);
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -168,7 +168,7 @@ class AuthController {
       const { refreshToken } = req.body;
 
       if (!refreshToken) {
-        return res.status(400).json({
+         res.status(400).json({
           success: false,
           error: 'Refresh token is required'
         });
@@ -178,12 +178,12 @@ class AuthController {
       const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'refresh-secret') as { userId: string };
       const newToken = this.generateToken(decoded.userId);
 
-      return res.json({
+       res.json({
         success: true,
         data: { token: newToken }
       });
     } catch (error) {
-      return res.status(401).json({
+       res.status(401).json({
         success: false,
         error: 'Invalid refresh token'
       });
@@ -196,7 +196,7 @@ class AuthController {
       const user = users.find(u => u.id === req.userId);
       
       if (!user) {
-        return res.status(404).json({
+         res.status(404).json({
           success: false,
           error: 'User not found'
         });
@@ -205,12 +205,12 @@ class AuthController {
 
       const { password, ...userWithoutPassword } = user;
 
-      return res.json({
+       res.json({
         success: true,
         data: { user: userWithoutPassword }
       });
     } catch (error) {
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -224,7 +224,7 @@ class AuthController {
       const user = users.find(u => u.id === id);
 
       if (!user) {
-        return res.status(404).json({
+         res.status(404).json({
           success: false,
           error: 'User not found'
         });
@@ -233,12 +233,12 @@ class AuthController {
 
       const { password, ...userWithoutPassword } = user;
 
-      return res.json({
+       res.json({
         success: true,
         data: { user: userWithoutPassword }
       });
     } catch (error) {
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -249,7 +249,7 @@ class AuthController {
   async getAllUsers(req: AuthRequest, res: Response): Promise<void> {
     try {
       if (req.userRole !== 'ADMIN') {
-        return res.status(403).json({
+         res.status(403).json({
           success: false,
           error: 'Admin access required'
         });
@@ -258,7 +258,7 @@ class AuthController {
 
       const usersWithoutPassword = users.map(({ password, ...user }) => user);
       
-      return res.json({
+       res.json({
         success: true,
         data: {
           count: users.length,
@@ -266,7 +266,7 @@ class AuthController {
         }
       });
     } catch (error) {
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -280,7 +280,7 @@ class AuthController {
       const userIndex = users.findIndex(u => u.id === req.userId);
 
       if (userIndex === -1) {
-        return res.status(404).json({
+         res.status(404).json({
           success: false,
           error: 'User not found'
         });
@@ -293,13 +293,13 @@ class AuthController {
 
       const { password, ...userWithoutPassword } = users[userIndex];
 
-      return res.json({
+       res.json({
         success: true,
         message: 'Profile updated successfully',
         data: { user: userWithoutPassword }
       });
     } catch (error) {
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -313,7 +313,7 @@ class AuthController {
       const user = users.find(u => u.id === req.userId);
 
       if (!user) {
-        return res.status(404).json({
+         res.status(404).json({
           success: false,
           error: 'User not found'
         });
@@ -322,7 +322,7 @@ class AuthController {
 
       const isValidPassword = await bcrypt.compare(currentPassword, user.password);
       if (!isValidPassword) {
-        return res.status(401).json({
+         res.status(401).json({
           success: false,
           error: 'Current password is incorrect'
         });
@@ -332,12 +332,12 @@ class AuthController {
       user.password = await bcrypt.hash(newPassword, 10);
       user.updatedAt = new Date();
 
-      return res.json({
+       res.json({
         success: true,
         message: 'Password changed successfully'
       });
     } catch (error) {
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -351,7 +351,7 @@ class AuthController {
       const user = users.find(u => u.phone === phone);
 
       if (!user) {
-        return res.status(404).json({
+         res.status(404).json({
           success: false,
           error: 'User not found'
         });
@@ -365,13 +365,13 @@ class AuthController {
       user.resetCode = resetCode;
       user.resetCodeExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
 
-      return res.json({
+       res.json({
         success: true,
         message: 'Password reset code sent',
         data: { resetCode } // Only for development
       });
     } catch (error) {
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -385,7 +385,7 @@ class AuthController {
       const user = users.find(u => u.phone === phone);
 
       if (!user) {
-        return res.status(404).json({
+         res.status(404).json({
           success: false,
           error: 'User not found'
         });
@@ -395,7 +395,7 @@ class AuthController {
       if (!user.resetCode || !user.resetCodeExpiry || 
           user.resetCode !== resetCode || 
           Date.now() > user.resetCodeExpiry) {
-        return res.status(400).json({
+         res.status(400).json({
           success: false,
           error: 'Invalid or expired reset code'
         });
@@ -407,12 +407,12 @@ class AuthController {
       delete user.resetCodeExpiry;
       user.updatedAt = new Date();
 
-      return res.json({
+       res.json({
         success: true,
         message: 'Password reset successfully'
       });
     } catch (error) {
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -423,12 +423,12 @@ class AuthController {
   async logout(req: AuthRequest, res: Response): Promise<void> {
     try {
       // In production, add token to blacklist
-      return res.json({
+       res.json({
         success: true,
         message: 'Logged out successfully'
       });
     } catch (error) {
-      return res.status(500).json({
+       res.status(500).json({
         success: false,
         error: 'Internal server error'
       });
@@ -452,7 +452,7 @@ async sendotp(req: Request, res: Response): Promise<void> {
     const { phone } = req.body;
 
     if (!phone) {
-      return res.status(400).json({
+       res.status(400).json({
         success: false,
         error: "Phone number is required"
       });
@@ -465,7 +465,7 @@ async sendotp(req: Request, res: Response): Promise<void> {
 
     console.log(`📱 otp for ${phone}: ${otp}`);
 
-    return res.json({
+     res.json({
       success: true,
       message: "otp sent successfully",
       data: {
@@ -474,7 +474,7 @@ async sendotp(req: Request, res: Response): Promise<void> {
     });
 
   } catch (error) {
-    return res.status(500).json({
+     res.status(500).json({
       success: false,
       error: "Failed to send otp"
     });
@@ -488,7 +488,7 @@ async verifyotp(req: Request, res: Response): Promise<void> {
     const { phone, otp } = req.body;
 
     if (!phone || !otp) {
-      return res.status(400).json({
+       res.status(400).json({
         success: false,
         error: "Phone and otp are required"
       });
@@ -496,7 +496,7 @@ async verifyotp(req: Request, res: Response): Promise<void> {
     }
 
     if (otp.length !== 6) {
-      return res.status(400).json({
+       res.status(400).json({
         success: false,
         error: "Invalid otp"
       });
@@ -507,7 +507,7 @@ async verifyotp(req: Request, res: Response): Promise<void> {
       Date.now().toString()
     );
 
-    return res.json({
+     res.json({
       success: true,
       message: "Login successful",
       data: {
@@ -520,7 +520,7 @@ async verifyotp(req: Request, res: Response): Promise<void> {
     });
 
   } catch (error) {
-    return res.status(500).json({
+     res.status(500).json({
       success: false,
       error: "otp verification failed"
     });
@@ -533,7 +533,7 @@ async registerDriver(req: Request, res: Response): Promise<void> {
   try {
     const { phone, name, vehicleType } = req.body;
 
-    return res.status(201).json({
+     res.status(201).json({
       success: true,
       message: "Driver registered successfully",
       data: {
@@ -545,7 +545,7 @@ async registerDriver(req: Request, res: Response): Promise<void> {
     });
 
   } catch (error) {
-    return res.status(500).json({
+     res.status(500).json({
       success: false,
       error: "Driver registration failed"
     });

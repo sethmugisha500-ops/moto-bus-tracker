@@ -20,7 +20,7 @@ export class WalletRepository {
         data: {
           walletId: wallet.id,
           amount,
-          description,
+          type: 'CREDIT', // Adjusted to match your schema's required type field
           reference,
           status: 'COMPLETED',
         },
@@ -37,7 +37,8 @@ export class WalletRepository {
       throw new Error('Insufficient balance');
     }
 
-    return prisma.$transaction(async (tx: { wallet: { update: (arg0: { where: { userId: string; }; data: { balance: { decrement: number; }; }; }) => any; }; transaction: { create: (arg0: { data: { walletId: any; amount: number;}; }) => any; }; }) => {
+    // Swapped the manual type block for Prisma's clean TransactionClient 
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const updatedWallet = await tx.wallet.update({
         where: { userId },
         data: { balance: { decrement: amount } },
@@ -47,7 +48,7 @@ export class WalletRepository {
         data: {
           walletId: wallet.id,
           amount: -amount,
-          description,
+          type: 'DEBIT', // Adjusted to match your schema's required type field
           reference,
           status: 'COMPLETED',
         },

@@ -10,14 +10,15 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import otpRoutes from './routes/otp';
 
-// 2. Wildcard namespace import to absorb non-default export modules
-import * as busesRoutes from './routes/buses'; 
+// 2. Wildcard namespace import to grab any named export inside buses
+import * as busesRoutesNamespace from './routes/buses'; 
 
-// 3. Explicit '.routes' extension paths matching file names on disk
-import usersRoutes from './routes/rider.routes';       // Removed .routes
-import driversRoutes from './routes/driver.routes';   // Removed .routes
-import ridersRoutes from './routes/rider.routes';     // Removed .routes
-import adminRoutes from './routes/admin.routes'; // Kept since it didn't throw an error!
+// 3. Exact matching paths based on your compiler logs
+import usersRoutes from './routes/';       
+import driversRoutes from './routes/driver.routes';   
+import ridersRoutes from './routes/rider.routes';     
+import adminRoutes from './routes/admin.routes'; 
+
 dotenv.config();
 
 const app = express();
@@ -27,29 +28,21 @@ const prisma = new PrismaClient();
 // Get allowed origins
 const getAllowedOrigins = (): string | string[] => {
   const origins = [
-    // Development
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:3002',
     'http://localhost:19000',
     'http://localhost:19001',
     'http://localhost:19002',
-    
-    // Render.com URLs
     'https://moto-bus-backend.onrender.com',
     'https://moto-bus-frontend.onrender.com',
     'https://moto-bus-admin.onrender.com',
-    
-    // Expo
     'https://expo.io',
     'https://exp.host',
-    
-    // Any other origins from environment
     process.env.FRONTEND_URL,
     process.env.ADMIN_URL,
   ].filter(Boolean) as string[];
 
-  // If ALLOW_ALL_CORS is true, allow all origins
   if (process.env.ALLOW_ALL_CORS === 'true') {
     console.log('⚠️ ALLOW_ALL_CORS is enabled - accepting all origins');
     return '*';
@@ -61,25 +54,18 @@ const getAllowedOrigins = (): string | string[] => {
 const corsOptions = {
   origin: (origin: string | undefined, callback: any) => {
     const allowed = getAllowedOrigins();
-    
-    // If allowed is '*', accept all
     if (allowed === '*') {
       callback(null, true);
       return;
     }
-
-    // Allow requests with no origin (like mobile apps, curl)
     if (!origin) {
       callback(null, true);
       return;
     }
-
-    // Check if origin is allowed
     if (allowed.includes(origin) || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
       console.warn(`⚠️ CORS blocked: ${origin}`);
-      // In production with ALLOW_ALL_CORS, allow all
       if (process.env.ALLOW_ALL_CORS === 'true') {
         callback(null, true);
       } else {
@@ -99,25 +85,22 @@ const corsOptions = {
     'Access-Control-Request-Headers'
   ],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 86400, // 24 hours
+  maxAge: 86400,
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
+app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Trust proxy (for Render)
 app.set('trust proxy', 1);
 
-// Request logging
 app.use((req, res, next) => {
   console.log(`📝 ${req.method} ${req.path}`);
   next();
 });
 
-// Health check - Important for Render
 app.get('/health', (req, res) => {
   return res.json({
     status: 'OK',
@@ -129,7 +112,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Version
 app.get('/api/version', (req, res) => {
   return res.json({
     version: '1.0.0',
@@ -138,7 +120,6 @@ app.get('/api/version', (req, res) => {
   });
 });
 
-// Socket.IO with CORS
 const io = new SocketServer(server, {
   cors: {
     origin: getAllowedOrigins(),
@@ -151,25 +132,29 @@ const io = new SocketServer(server, {
   pingInterval: 25000,
 });
 
-// Socket connection handler
 io.on('connection', (socket) => {
   console.log('🔌 New client connected:', socket.id);
-  
   socket.on('disconnect', () => {
     console.log('🔌 Client disconnected:', socket.id);
   });
 });
 
-// Mount Routes securely as safe express handlers
+// Extract the correct Router fallback from the buses module namespace object
+const busesRouter = 
+  (busesRoutesNamespace as any).default || 
+  (busesRoutesNamespace as any).router || 
+  (busesRoutesNamespace as any).busesRouter || 
+  busesRoutesNamespace;
+
+// Mount Routes safely as pure middleware functions
 app.use('/api/otp', otpRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/buses', busesRoutes as any);
+app.use('/api/buses', busesRouter);
 app.use('/api/users', usersRoutes);
 app.use('/api/drivers', driversRoutes);
 app.use('/api/riders', ridersRoutes);
 app.use('/api/admin', adminRoutes);
 
-// 404 handler
 app.use((req, res) => {
   return res.status(404).json({
     success: false,
@@ -177,7 +162,6 @@ app.use((req, res) => {
   });
 });
 
-// Error handler
 app.use((err: any, req: any, res: any, next: any) => {
   console.error('❌ Error:', err);
   return res.status(err.status || 500).json({

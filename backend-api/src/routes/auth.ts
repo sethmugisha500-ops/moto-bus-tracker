@@ -385,4 +385,6 @@ function generateJWT(user: any): string {
   );
 }
 
+// Add this at the very bottom of src/routes/auth.ts
+export { router as authRoutes };
 export default router;

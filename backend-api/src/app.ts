@@ -6,6 +6,15 @@ import { Server as SocketServer } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 
+// Standardized TypeScript route imports to prevent runtime undefined interop errors
+import authRoutes from './routes/auth';
+import otpRoutes from './routes/otp';
+import busesRoutes from './routes/buses';
+import usersRoutes from './routes/users';
+import driversRoutes from './routes/drivers';
+import ridersRoutes from './routes/riders';
+import adminRoutes from './routes/admin';
+
 dotenv.config();
 
 const app = express();
@@ -148,14 +157,14 @@ io.on('connection', (socket) => {
   });
 });
 
-// Routes
-app.use('/api/otp', require('./routes/otp').default);
-app.use('/api/auth', require('./routes/auth').default);
-app.use('/api/buses', require('./routes/buses').default);
-app.use('/api/users', require('./routes/users').default);
-app.use('/api/drivers', require('./routes/drivers').default);
-app.use('/api/riders', require('./routes/riders').default);
-app.use('/api/admin', require('./routes/admin').default);
+// Mount Routes cleanly using unified ES imports
+app.use('/api/otp', otpRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/buses', busesRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/drivers', driversRoutes);
+app.use('/api/riders', ridersRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler
 app.use((req, res) => {

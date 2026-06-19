@@ -14,11 +14,10 @@ import otpRoutes from './routes/otp';
 import * as busesRoutes from './routes/buses'; 
 
 // 3. Explicit '.routes' extension paths matching file names on disk
-import usersRoutes from './routes/users.routes';
-import driversRoutes from './routes/drivers';
-import ridersRoutes from './routes/riders.routes';
-import adminRoutes from './routes/admin.routes';
-
+import usersRoutes from './routes/rider.routes';       // Removed .routes
+import driversRoutes from './routes/driver.routes';   // Removed .routes
+import ridersRoutes from './routes/rider.routes';     // Removed .routes
+import adminRoutes from './routes/admin.routes'; // Kept since it didn't throw an error!
 dotenv.config();
 
 const app = express();

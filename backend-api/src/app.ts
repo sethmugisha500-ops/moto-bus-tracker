@@ -14,7 +14,7 @@ import otpRoutes from './routes/otp';
 import * as busesRoutesNamespace from './routes/buses'; 
 
 // 3. Exact matching paths based on your compiler logs
-import usersRoutes from './routes/users.routes';       
+import usersRoutes from './routes/users';       
 import driversRoutes from './routes/driver.routes';   
 import ridersRoutes from './routes/rider.routes';     
 import adminRoutes from './routes/admin.routes'; 

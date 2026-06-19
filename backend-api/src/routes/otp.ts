@@ -19,7 +19,7 @@ router.post('/verify', async (req: Request, res: Response) => {
         const result = await otpService.verifyOTP(phone, otp);
         res.json({ success: true, ...result });
     } catch (error: any) {
-        res.status(500).json({ success: false, message: error.message });
+        res.json(result);
     }
 });
 

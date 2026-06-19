@@ -1,13 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../prisma/client';
+import { prisma } from '../../prisma/client';
 
 export interface AuthRequest extends Request {
     user?: {
         id: string;
         phone: string;
-        name: string;
         role: string;
+        name?: string;
     };
 }
 

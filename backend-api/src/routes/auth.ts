@@ -385,6 +385,11 @@ function generateJWT(user: any): string {
   );
 }
 
-// Add this at the very bottom of src/routes/auth.ts
+// src/routes/auth.ts
+
+// 1. Named export matching exactly what app.ts might be looking for
 export { router as authRoutes };
+export { router as authRouter };
+
+// 2. Default export just in case it uses a standard default import
 export default router;

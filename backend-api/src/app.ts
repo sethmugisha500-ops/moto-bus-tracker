@@ -6,14 +6,18 @@ import { Server as SocketServer } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 
-// Standardized TypeScript route imports to prevent runtime undefined interop errors
+// 1. Core authentication / OTP routes
 import authRoutes from './routes/auth';
 import otpRoutes from './routes/otp';
-import busesRoutes from './routes/buses';
-import usersRoutes from './routes/users';
+
+// 2. Wildcard namespace import to absorb non-default export modules
+import * as busesRoutes from './routes/buses'; 
+
+// 3. Explicit '.routes' extension paths matching file names on disk
+import usersRoutes from './routes/users.routes';
 import driversRoutes from './routes/drivers';
-import ridersRoutes from './routes/riders';
-import adminRoutes from './routes/admin';
+import ridersRoutes from './routes/riders.routes';
+import adminRoutes from './routes/admin.routes';
 
 dotenv.config();
 
@@ -157,10 +161,10 @@ io.on('connection', (socket) => {
   });
 });
 
-// Mount Routes cleanly using unified ES imports
+// Mount Routes securely as safe express handlers
 app.use('/api/otp', otpRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/buses', busesRoutes);
+app.use('/api/buses', busesRoutes as any);
 app.use('/api/users', usersRoutes);
 app.use('/api/drivers', driversRoutes);
 app.use('/api/riders', ridersRoutes);

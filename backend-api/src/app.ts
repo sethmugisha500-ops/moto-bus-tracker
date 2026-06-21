@@ -45,7 +45,7 @@ const corsOptions = {
       return;
     }
 
-    if (!origin) {
+    if (!origin || (process.env.NODE_ENV !== 'production')) {
       callback(null, true);
       return;
     }
@@ -53,12 +53,7 @@ const corsOptions = {
     if (Array.isArray(allowed) && allowed.includes(origin)) {
       callback(null, true);
     } else {
-      // Allow in development
-      if (process.env.NODE_ENV !== 'production') {
-        callback(null, true);
-      } else {
-        callback(new Error('CORS not allowed'), false);
-      }
+      callback(new Error('CORS not allowed'), false);
     }
   },
   credentials: true,
@@ -95,56 +90,45 @@ app.get('/api/version', (req, res) => {
 });
 
 // ============================================
-// ROUTE IMPORTS - Using your current files
+// ROUTE IMPORTS
 // ============================================
 
-// Check what routes you have in src/routes/
-// Based on your git output, you have:
-// - auth.routes.ts (not auth.ts)
-// - users.ts
-// - buses.ts (you created)
-// - etc.
-
-// Import routes - adjust names based on your actual files
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/users';
 import busRoutes from './routes/buses';
 
-// Also try to import other routes if they exist
+// Optional routes (will only load if files exist)
 let otpRoutes: any;
 let driverRoutes: any;
 let riderRoutes: any;
 let adminRoutes: any;
 
 try {
-  otpRoutes = require('./routes/otp').default;
+  otpRoutes = require('./routes/otp').default || require('./routes/otp');
 } catch (e) {
-  console.log('⚠️ OTP routes not found, skipping');
-  otpRoutes = (req: any, res: any) => res.status(404).json({ error: 'OTP routes not implemented' });
+  // Silent - OTP routes are optional for now
+  otpRoutes = (req: any, res: any) => res.status(501).json({ message: 'OTP routes not implemented yet' });
 }
 
 try {
-  driverRoutes = require('./routes/drivers').default;
+  driverRoutes = require('./routes/drivers').default || require('./routes/drivers');
 } catch (e) {
-  console.log('⚠️ Driver routes not found, skipping');
-  driverRoutes = (req: any, res: any) => res.status(404).json({ error: 'Driver routes not implemented' });
+  driverRoutes = (req: any, res: any) => res.status(501).json({ message: 'Driver routes not implemented yet' });
 }
 
 try {
-  riderRoutes = require('./routes/riders').default;
+  riderRoutes = require('./routes/riders').default || require('./routes/riders');
 } catch (e) {
-  console.log('⚠️ Rider routes not found, skipping');
-  riderRoutes = (req: any, res: any) => res.status(404).json({ error: 'Rider routes not implemented' });
+  riderRoutes = (req: any, res: any) => res.status(501).json({ message: 'Rider routes not implemented yet' });
 }
 
 try {
-  adminRoutes = require('./routes/admin').default;
+  adminRoutes = require('./routes/admin').default || require('./routes/admin');
 } catch (e) {
-  console.log('⚠️ Admin routes not found, skipping');
-  adminRoutes = (req: any, res: any) => res.status(404).json({ error: 'Admin routes not implemented' });
+  adminRoutes = (req: any, res: any) => res.status(501).json({ message: 'Admin routes not implemented yet' });
 }
 
-// Use routes
+// Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/buses', busRoutes);

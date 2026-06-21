@@ -17,8 +17,10 @@ export class UserRepository {
   }
 
   async findByEmail(email: string) {
-    return prisma.user.findUnique({
-      where: { email: email || undefined },
+    if (!email) return null;
+    
+    return prisma.user.findFirst({  // Changed from findUnique → findFirst
+      where: { email: email.toLowerCase().trim() },
       include: {
         driver: true,
         wallet: true,
@@ -194,13 +196,10 @@ export class UserRepository {
       phone: data.phone,
       name: data.name,
       email: data.email || null,
+      password: data.password || '',           // ← Fixed: password is required
       role: data.role || 'RIDER',
       wallet: { create: { balance: 0 } },
     };
-
-    if (data.password) {
-      // // createData.password = data.password;
-    }
 
     return prisma.user.create({
       data: createData,
@@ -226,7 +225,7 @@ export class UserRepository {
         phone: data.phone,
         name: data.name,
         email: data.email || null,
-        password: data.password,
+        password: data.password || '',           // ← Fixed
         role: 'DRIVER',
         wallet: { create: { balance: 0 } },
         driver: {
@@ -263,7 +262,7 @@ export class UserRepository {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.email !== undefined) updateData.email = data.email;
-    // // if (data.password !== undefined) updateData.password = data.password;
+    if (data.password !== undefined) updateData.password = data.password;  // ← Uncommented & fixed
     if (data.role !== undefined) updateData.role = data.role;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.isVerified !== undefined) updateData.isVerified = data.isVerified;
@@ -323,10 +322,7 @@ export class UserRepository {
     });
   }
 
-  // ============================================
-  // STATS METHODS
-  // ============================================
-
+  // ... (rest of your methods remain unchanged - getStats, getDriverStats, exists, etc.)
   async getStats() {
     const [
       totalUsers,
@@ -354,7 +350,6 @@ export class UserRepository {
       })
     ]);
 
-    // Get user growth over last 7 days
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - i);
@@ -402,6 +397,7 @@ export class UserRepository {
     };
   }
 
+  // (All other methods like getDriverStats, exists, etc. remain the same)
   async getDriverStats(driverId: string) {
     const driver = await prisma.driver.findUnique({
       where: { id: driverId },
@@ -444,10 +440,6 @@ export class UserRepository {
     };
   }
 
-  // ============================================
-  // CHECK METHODS
-  // ============================================
-
   async exists(phone: string, email?: string) {
     const where: Prisma.UserWhereInput = {
       OR: [
@@ -461,23 +453,15 @@ export class UserRepository {
   }
 
   async isPhoneTaken(phone: string) {
-    const count = await prisma.user.count({
-      where: { phone }
-    });
+    const count = await prisma.user.count({ where: { phone } });
     return count > 0;
   }
 
   async isEmailTaken(email: string) {
     if (!email) return false;
-    const count = await prisma.user.count({
-      where: { email }
-    });
+    const count = await prisma.user.count({ where: { email } });
     return count > 0;
   }
-
-  // ============================================
-  // COUNT METHODS
-  // ============================================
 
   async count(where?: Prisma.UserWhereInput) {
     return prisma.user.count({ where });
@@ -486,10 +470,6 @@ export class UserRepository {
   async countDrivers(where?: Prisma.DriverWhereInput) {
     return prisma.driver.count({ where });
   }
-
-  // ============================================
-  // BULK METHODS
-  // ============================================
 
   async findMany(where?: Prisma.UserWhereInput, limit = 50, page = 1) {
     const skip = (page - 1) * limit;

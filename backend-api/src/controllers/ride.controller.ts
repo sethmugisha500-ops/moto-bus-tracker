@@ -12,9 +12,10 @@ export class RideController {
                     status: 'PENDING'
                 }
             });
-            res.json({ success: true, data: ride });
+            return res.json({ success: true, data: ride });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -24,9 +25,10 @@ export class RideController {
                 where: { riderId: req.user!.id },
                 orderBy: { createdAt: 'desc' }
             });
-            res.json({ success: true, data: rides });
+            return res.json({ success: true, data: rides });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -39,9 +41,10 @@ export class RideController {
             if (!ride) {
                 return res.status(404).json({ success: false, message: 'Ride not found' });
             }
-            res.json({ success: true, data: ride });
+            return res.json({ success: true, data: ride });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -51,9 +54,10 @@ export class RideController {
                 _count: { id: true },
                 _sum: { fare: true }
             });
-            res.json({ success: true, data: stats });
+            return res.json({ success: true, data: stats });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -64,9 +68,10 @@ export class RideController {
                 orderBy: { createdAt: 'desc' },
                 include: { driver: { include: { user: true } } }
             });
-            res.json({ success: true, data: rides });
+            return res.json({ success: true, data: rides });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -83,9 +88,10 @@ export class RideController {
                 orderBy: { createdAt: 'desc' },
                 include: { rider: true }
             });
-            res.json({ success: true, data: rides });
+            return res.json({ success: true, data: rides });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -102,9 +108,10 @@ export class RideController {
                 where: { id },
                 data: { driverId: driver.id, status: 'ACCEPTED' }
             });
-            res.json({ success: true, data: ride });
+            return res.json({ success: true, data: ride });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -115,9 +122,10 @@ export class RideController {
                 where: { id },
                 data: { status: 'STARTED' }
             });
-            res.json({ success: true, data: ride });
+            return res.json({ success: true, data: ride });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -128,9 +136,10 @@ export class RideController {
                 where: { id },
                 data: { status: 'COMPLETED', completedAt: new Date() }
             });
-            res.json({ success: true, data: ride });
+            return res.json({ success: true, data: ride });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -141,9 +150,10 @@ export class RideController {
                 where: { id },
                 data: { status: 'CANCELLED', cancelledAt: new Date() }
             });
-            res.json({ success: true, data: ride });
+            return res.json({ success: true, data: ride });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -170,9 +180,10 @@ export class RideController {
                     comment: comment || ''
                 }
             });
-            res.json({ success: true, data: newRating });
+            return res.json({ success: true, data: newRating });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 
@@ -190,9 +201,10 @@ export class RideController {
                     status: 'ACTIVE'
                 }
             });
-            res.json({ success: true, data: sos });
+            return res.json({ success: true, data: sos });
         } catch (error: any) {
-            res.status(500).json({ success: false, message: error.message });
+            console.error(error);
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 }

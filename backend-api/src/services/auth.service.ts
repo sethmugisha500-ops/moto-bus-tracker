@@ -20,7 +20,7 @@ export class AuthService {
                 name: data.name,
                 email: data.email || null,
                 password: hashedPassword,
-                role: data.role as any || 'RIDER',
+                role: (data.role as any) || 'RIDER',
                 wallet: { create: { balance: 0 } }
             }
         });
@@ -41,14 +41,10 @@ export class AuthService {
             }
         });
 
-        if (!user) {
-            throw new Error('Invalid credentials');
-        }
+        if (!user) throw new Error('Invalid credentials');
 
-        const isValidPassword = await bcrypt.compare(password, user.password);
-        if (!isValidPassword) {
-            throw new Error('Invalid credentials');
-        }
+        const isValidPassword = await bcrypt.compare(password, user.password!);
+        if (!isValidPassword) throw new Error('Invalid credentials');
 
         const token = jwt.sign(
             { userId: user.id, role: user.role },

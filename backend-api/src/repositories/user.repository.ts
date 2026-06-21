@@ -3,10 +3,6 @@ import { prisma } from '../../prisma/client';
 import bcrypt from 'bcryptjs';
 
 export class UserRepository {
-  // ============================================
-  // FIND METHODS
-  // ============================================
-
   async findByPhone(phone: string) {
     return prisma.user.findUnique({
       where: { phone },
@@ -25,35 +21,11 @@ export class UserRepository {
   async findById(id: string) {
     return prisma.user.findUnique({
       where: { id },
-      include: {
-        driver: {
-          include: {
-            ratings: { take: 10, orderBy: { createdAt: 'desc' } },
-            rides: { take: 10, orderBy: { createdAt: 'desc' } }
-          }
-        },
-        wallet: {
-          include: {
-            transactions: { take: 10, orderBy: { createdAt: 'desc' } }
-          }
-        },
-        payments: { take: 10, orderBy: { createdAt: 'desc' } },
-        ratings: { take: 10, orderBy: { createdAt: 'desc' } },
-        rides: {
-          take: 10,
-          orderBy: { createdAt: 'desc' },
-          include: { driver: { include: { user: { select: { id: true, name: true, phone: true } } } } }
-        }
-      },
+      include: { driver: true, wallet: true }
     });
   }
 
-  // ... (keep your other find methods as they are)
-
-  // ============================================
-  // CREATE METHODS - FIXED
-  // ============================================
-
+  // CREATE - FIXED
   async create(data: {
     phone: string;
     name: string;
@@ -65,17 +37,15 @@ export class UserRepository {
       ? await bcrypt.hash(data.password, 10) 
       : '';
 
-    const createData: Prisma.UserCreateInput = {
-      phone: data.phone,
-      name: data.name,
-      email: data.email || null,
-      password: hashedPassword,
-      role: data.role || 'RIDER',
-      wallet: { create: { balance: 0 } },
-    };
-
     return prisma.user.create({
-      data: createData,
+      data: {
+        phone: data.phone,
+        name: data.name,
+        email: data.email || null,
+        password: hashedPassword,
+        role: data.role || 'RIDER',
+        wallet: { create: { balance: 0 } },
+      },
       include: {
         wallet: true,
         driver: data.role === 'DRIVER' ? true : false
@@ -83,65 +53,13 @@ export class UserRepository {
     });
   }
 
-  async createWithDriver(data: {
-    phone: string;
-    name: string;
-    email?: string;
-    password?: string;
-    licenseNumber: string;
-    vehicleType: string;
-    vehicleNumber: string;
-    vehicleModel: string;
-  }) {
-    const hashedPassword = data.password 
-      ? await bcrypt.hash(data.password, 10) 
-      : '';
+  // UPDATE - FIXED
+  async update(id: string, data: any) {
+    const updateData: any = { ...data };
 
-    return prisma.user.create({
-      data: {
-        phone: data.phone,
-        name: data.name,
-        email: data.email || null,
-        password: hashedPassword,
-        role: 'DRIVER',
-        wallet: { create: { balance: 0 } },
-        driver: {
-          create: {
-            licenseNumber: data.licenseNumber,
-            vehicleType: data.vehicleType as any,
-            vehicleNumber: data.vehicleNumber,
-            vehicleModel: data.vehicleModel,
-          }
-        }
-      },
-      include: { driver: true, wallet: true }
-    });
-  }
-
-  // ============================================
-  // UPDATE METHODS - FIXED
-  // ============================================
-
-  async update(id: string, data: {
-    name?: string;
-    phone?: string;
-    email?: string;
-    password?: string;
-    role?: UserRole;
-    isActive?: boolean;
-    isVerified?: boolean;
-  }) {
-    const updateData: Prisma.UserUpdateInput = {};
-
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.phone !== undefined) updateData.phone = data.phone;
-    if (data.email !== undefined) updateData.email = data.email;
-    if (data.password !== undefined) {
+    if (data.password) {
       updateData.password = await bcrypt.hash(data.password, 10);
     }
-    if (data.role !== undefined) updateData.role = data.role;
-    if (data.isActive !== undefined) updateData.isActive = data.isActive;
-    if (data.isVerified !== undefined) updateData.isVerified = data.isVerified;
 
     return prisma.user.update({
       where: { id },
@@ -150,8 +68,8 @@ export class UserRepository {
     });
   }
 
-  // Keep the rest of your methods (getStats, getDriverStats, etc.) unchanged
-  // ... paste the rest of your original methods here
+  // Keep your other methods (getStats, findWithFilters, etc.)
+  // ... paste the rest here if needed
 }
 
 export const userRepository = new UserRepository();

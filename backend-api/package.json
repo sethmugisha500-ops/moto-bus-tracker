@@ -6,9 +6,9 @@
   "scripts": {
     "seed": "ts-node prisma/seed.ts",
     "start": "node dist/server.js",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "dev": "nodemon src/server.ts",
-    "postinstall": "npm run build"
+    "postinstall": "prisma generate"
   },
   "engines": {
     "node": ">=18.0.0"

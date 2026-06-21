@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { prisma } from '../../prisma/client';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export class RideController {
     async requestRide(req: AuthRequest, res: Response) {

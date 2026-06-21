@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { prisma } from '../../prisma/client';
+import { PrismaClient } from '@prisma/client';
+
+// Use a local PrismaClient instance to avoid importing files outside of tsconfig rootDir
+const prisma = new PrismaClient();
 
 export class SOSController {
   // ============================================

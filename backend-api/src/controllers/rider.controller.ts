@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { prisma } from '../../prisma/client';
-import { VehicleType } from '@prisma/client';
+import { PrismaClient, VehicleType } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export class RiderController {
   // ============================================

@@ -1,5 +1,7 @@
 import { PrismaClient, UserRole, Prisma } from '@prisma/client';
-import { prisma } from '../../prisma/client';
+
+// Create a local PrismaClient instance to avoid importing files outside src (rootDir)
+const prisma = new PrismaClient();
 import bcrypt from 'bcryptjs';
 
 export class UserRepository {

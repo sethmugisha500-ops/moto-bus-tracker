@@ -4,12 +4,12 @@
   "description": "Moto-Bus Tracker Backend API",
   "main": "dist/server.js",
   "scripts": {
-    "seed": "ts-node prisma/seed.ts",
-    "start": "node dist/server.js",
-    "build": "prisma generate && tsc",
-    "dev": "nodemon src/server.ts",
-    "postinstall": "prisma generate"
-  },
+  "seed": "ts-node prisma/seed.ts",
+  "start": "node dist/server.js",
+  "build": "prisma generate && tsc",
+  "dev": "nodemon src/server.ts",
+  "postinstall": "prisma generate"
+},
   "engines": {
     "node": ">=18.0.0"
   },

@@ -7,7 +7,7 @@ services:
     rootDir: backend-api
     buildCommand: npm install && npm run build
     startCommand: npx prisma migrate deploy && npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production

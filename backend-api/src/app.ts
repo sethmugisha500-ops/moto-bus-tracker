@@ -96,8 +96,9 @@ app.get('/api/version', (req, res) => {
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/users';
 import busRoutes from './routes/buses';
+import ridesRoutes from './routes/rides'; // ← ADD THIS
 
-// Optional routes (will only load if files exist)
+// Optional routes
 let otpRoutes: any;
 let driverRoutes: any;
 let riderRoutes: any;
@@ -106,7 +107,6 @@ let adminRoutes: any;
 try {
   otpRoutes = require('./routes/otp').default || require('./routes/otp');
 } catch (e) {
-  // Silent - OTP routes are optional for now
   otpRoutes = (req: any, res: any) => res.status(501).json({ message: 'OTP routes not implemented yet' });
 }
 
@@ -128,10 +128,13 @@ try {
   adminRoutes = (req: any, res: any) => res.status(501).json({ message: 'Admin routes not implemented yet' });
 }
 
-// Mount Routes
+// ============================================
+// MOUNT ROUTES
+// ============================================
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/buses', busRoutes);
+app.use('/api/rides', ridesRoutes); // ← ADD THIS
 app.use('/api/otp', otpRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/riders', riderRoutes);
@@ -153,8 +156,25 @@ const io = new SocketServer(server, {
   pingInterval: 25000,
 });
 
+app.set('io', io);
+
 io.on('connection', (socket) => {
   console.log('🔌 New client connected:', socket.id);
+  
+  socket.on('join', (userId) => {
+    socket.join(`user_${userId}`);
+    console.log(`👤 User ${userId} joined room`);
+  });
+  
+  socket.on('join-driver', (driverId) => {
+    socket.join(`driver_${driverId}`);
+    console.log(`🚗 Driver ${driverId} joined room`);
+  });
+  
+  socket.on('join-rider', (riderId) => {
+    socket.join(`rider_${riderId}`);
+    console.log(`🚕 Rider ${riderId} joined room`);
+  });
   
   socket.on('disconnect', () => {
     console.log('🔌 Client disconnected:', socket.id);

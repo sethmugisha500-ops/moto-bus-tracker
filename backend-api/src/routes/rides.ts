@@ -164,7 +164,10 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({
         success: false,
         message: 'Validation error',
-        errors: error.errors,
+        errors: error.issues.map((e: any) => ({
+          path: Array.isArray(e.path) ? e.path.join('.') : String(e.path),
+          message: e.message,
+        })),
       });
     }
     res.status(500).json({
@@ -195,7 +198,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     };
 
     if (status) {
-      where.status = status;
+      where.status = status as string;
     }
 
     const rides = await prisma.ride.findMany({
@@ -440,7 +443,19 @@ router.put('/:id/start', async (req: AuthRequest, res: Response) => {
 
     const ride = await prisma.ride.findUnique({
       where: { id },
-      include: { driver: true },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!ride) {
@@ -535,7 +550,19 @@ router.put('/:id/complete', async (req: AuthRequest, res: Response) => {
 
     const ride = await prisma.ride.findUnique({
       where: { id },
-      include: { driver: true },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!ride) {
@@ -791,16 +818,16 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
     });
 
     // Update driver's average rating
-    const driverRatings = await prisma.rating.aggregate({
-      where: { driverId: ride.driverId },
-      _avg: { rating: true },
-    });
+    if (ride.driverId) {
+      const driverRatings = await prisma.rating.aggregate({
+        where: { driverId: ride.driverId },
+        _avg: { rating: true },
+      });
 
-    if (ride.driverId && driverRatings._avg?.rating !== undefined) {
       await prisma.driver.update({
         where: { id: ride.driverId },
         data: {
-          rating: driverRatings._avg.rating,
+          rating: driverRatings._avg.rating ?? 0,
         },
       });
     }
@@ -816,7 +843,10 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({
         success: false,
         message: 'Validation error',
-        errors: error.errors,
+        errors: error.errors.map((e: any) => ({
+          path: e.path.join('.'),
+          message: e.message,
+        })),
       });
     }
     res.status(500).json({

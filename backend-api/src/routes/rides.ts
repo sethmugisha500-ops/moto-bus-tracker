@@ -843,7 +843,7 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({
         success: false,
         message: 'Validation error',
-        errors: error.errors.map((e: any) => ({
+        errors: error.issues.map((e: any) => ({
           path: e.path.join('.'),
           message: e.message,
         })),

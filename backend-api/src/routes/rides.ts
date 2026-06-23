@@ -1,6 +1,6 @@
 // backend-api/src/routes/rides.ts
 import express, { Request, Response } from 'express';
-import { PrismaClient, VehicleType, PaymentMethod, RideStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { z } from 'zod';
 
@@ -57,7 +57,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const activeRide = await prisma.ride.findFirst({
       where: {
         riderId: userId,
-        status: { in: ['PENDING', 'ACCEPTED', 'STARTED'] as RideStatus[] },
+        status: { in: ['PENDING', 'ACCEPTED', 'STARTED'] },
       },
     });
 
@@ -91,7 +91,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         distance: distance,
         duration: duration,
         fare: validated.fare,
-        paymentMethod: validated.paymentMethod.toUpperCase() as PaymentMethod,
+        paymentMethod: validated.paymentMethod.toUpperCase() as any,
         status: 'PENDING',
       },
       include: {
@@ -198,7 +198,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     };
 
     if (status) {
-      where.status = status as string;
+      where.status = status;
     }
 
     const rides = await prisma.ride.findMany({
@@ -441,9 +441,22 @@ router.put('/:id/start', async (req: AuthRequest, res: Response) => {
       });
     }
 
+    // Get ride with driver included
     const ride = await prisma.ride.findUnique({
       where: { id },
-      include: { driver: true },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!ride) {
@@ -471,7 +484,6 @@ router.put('/:id/start', async (req: AuthRequest, res: Response) => {
       where: { id },
       data: {
         status: 'STARTED',
-        startedAt: new Date(),
       },
       include: {
         rider: {
@@ -538,7 +550,19 @@ router.put('/:id/complete', async (req: AuthRequest, res: Response) => {
 
     const ride = await prisma.ride.findUnique({
       where: { id },
-      include: { driver: true },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!ride) {
@@ -620,7 +644,7 @@ router.put('/:id/complete', async (req: AuthRequest, res: Response) => {
         rideId: id,
         fare: ride.fare,
         driver: {
-          name: updatedRide.driver?.user?.name,
+          name: ride.driver?.user?.name,
         },
       });
     }
@@ -654,7 +678,19 @@ router.put('/:id/cancel', async (req: AuthRequest, res: Response) => {
 
     const ride = await prisma.ride.findUnique({
       where: { id },
-      include: { driver: true },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!ride) {
@@ -748,7 +784,19 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
 
     const ride = await prisma.ride.findUnique({
       where: { id },
-      include: { driver: true },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!ride) {
@@ -772,13 +820,6 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
       });
     }
 
-    if (!ride.driverId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Ride has no assigned driver',
-      });
-    }
-
     const existingRating = await prisma.rating.findUnique({
       where: { rideId: id },
     });
@@ -790,11 +831,18 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
       });
     }
 
+    if (!ride.driverId) {
+      return res.status(500).json({
+        success: false,
+        message: 'Driver information is missing for this ride',
+      });
+    }
+
     const ratingRecord = await prisma.rating.create({
       data: {
         rideId: id,
         riderId: userId,
-        driverId: ride.driverId!,
+        driverId: ride.driverId,
         rating: validated.rating,
         comment: validated.comment || null,
       },
@@ -806,11 +854,12 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
       _avg: { rating: true },
     });
 
-    if (ride.driverId) {
+    const averageRating = driverRatings._avg?.rating;
+    if (averageRating != null) {
       await prisma.driver.update({
         where: { id: ride.driverId },
         data: {
-          rating: driverRatings._avg.rating ?? 0,
+          rating: averageRating,
         },
       });
     }

@@ -164,9 +164,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({
         success: false,
         message: 'Validation error',
-        errors: error.issues.map((e: any) => ({
-          path: Array.isArray(e.path) ? e.path.join('.') : String(e.path),
-          message: e.message,
+        errors: error.issues.map((issue: any) => ({
+          path: issue.path.join('.'),
+          message: issue.message,
         })),
       });
     }
@@ -443,19 +443,7 @@ router.put('/:id/start', async (req: AuthRequest, res: Response) => {
 
     const ride = await prisma.ride.findUnique({
       where: { id },
-      include: {
-        driver: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-      },
+      include: { driver: true },
     });
 
     if (!ride) {
@@ -514,9 +502,9 @@ router.put('/:id/start', async (req: AuthRequest, res: Response) => {
         rideId: id,
         status: 'STARTED',
         driver: {
-          name: ride.driver?.user?.name,
-          phone: ride.driver?.user?.phone,
-          vehicleNumber: ride.driver?.vehicleNumber,
+          name: updatedRide.driver?.user?.name,
+          phone: updatedRide.driver?.user?.phone,
+          vehicleNumber: updatedRide.driver?.vehicleNumber,
         },
       });
     }
@@ -550,19 +538,7 @@ router.put('/:id/complete', async (req: AuthRequest, res: Response) => {
 
     const ride = await prisma.ride.findUnique({
       where: { id },
-      include: {
-        driver: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
-            },
-          },
-        },
-      },
+      include: { driver: true },
     });
 
     if (!ride) {
@@ -644,7 +620,7 @@ router.put('/:id/complete', async (req: AuthRequest, res: Response) => {
         rideId: id,
         fare: ride.fare,
         driver: {
-          name: ride.driver?.user?.name,
+          name: updatedRide.driver?.user?.name,
         },
       });
     }
@@ -796,6 +772,13 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
       });
     }
 
+    if (!ride.driverId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ride has no assigned driver',
+      });
+    }
+
     const existingRating = await prisma.rating.findUnique({
       where: { rideId: id },
     });
@@ -818,12 +801,12 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
     });
 
     // Update driver's average rating
-    if (ride.driverId) {
-      const driverRatings = await prisma.rating.aggregate({
-        where: { driverId: ride.driverId },
-        _avg: { rating: true },
-      });
+    const driverRatings = await prisma.rating.aggregate({
+      where: { driverId: ride.driverId },
+      _avg: { rating: true },
+    });
 
+    if (ride.driverId) {
       await prisma.driver.update({
         where: { id: ride.driverId },
         data: {
@@ -843,9 +826,9 @@ router.post('/:id/rate', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({
         success: false,
         message: 'Validation error',
-        errors: error.issues.map((e: any) => ({
-          path: e.path.join('.'),
-          message: e.message,
+        errors: error.issues.map((issue: any) => ({
+          path: issue.path.join('.'),
+          message: issue.message,
         })),
       });
     }

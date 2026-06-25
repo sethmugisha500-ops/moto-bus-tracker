@@ -1,11 +1,18 @@
 // backend-api/src/server.ts
 import dotenv from 'dotenv';
-import { app, server, prisma } from './app';
 
+// ✅ Load .env FIRST - before any other imports
 dotenv.config();
+
+// ✅ Now import everything else
+import { app, server, prisma } from './app';
 
 const PORT = parseInt(process.env.PORT || '5000');
 const HOST = '0.0.0.0';
+
+// Debug - check if JWT_SECRET is loaded
+console.log('🔑 JWT_SECRET loaded:', process.env.JWT_SECRET ? '✅ Yes' : '❌ No');
+console.log('🔑 JWT_SECRET value:', process.env.JWT_SECRET ? '********' : '❌ Missing');
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {

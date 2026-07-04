@@ -125,7 +125,7 @@ export default function GlobalSupport() {
       label: "Live Chat", 
       color: "text-green-500", 
       bg: "bg-green-500/10",
-      action: () => toast.info("💬 Starting live chat... Please wait for an agent."),
+      action: () => toast("💬 Starting live chat... Please wait for an agent."),
       desc: "24/7 instant support"
     },
     { 

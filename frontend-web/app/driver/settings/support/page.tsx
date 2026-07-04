@@ -132,7 +132,7 @@ export default function DriverSupport() {
       label: "Live Chat", 
       color: "text-green-500", 
       bg: "bg-green-500/10",
-      action: () => toast.info("💬 Starting live chat... Please wait for an agent."),
+      action: () => toast("💬 Starting live chat... Please wait for an agent."),
       available: true
     },
     { 
@@ -162,7 +162,7 @@ export default function DriverSupport() {
       label: "Driver Guide", 
       color: "text-purple-500", 
       bg: "bg-purple-500/10",
-      action: () => toast.info("📖 Opening driver guide..."),
+      action: () => toast("📖 Opening driver guide..."),
       available: true
     },
   ];

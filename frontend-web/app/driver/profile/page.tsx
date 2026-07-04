@@ -135,7 +135,7 @@ export default function DriverProfile() {
             walletBalance: 0,
             joinedAt: new Date().toISOString(),
           });
-          toast.info('Showing basic profile info');
+          toast('Showing basic profile info');
         }
       }
     } catch (err) {

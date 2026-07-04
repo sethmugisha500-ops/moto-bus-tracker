@@ -94,7 +94,7 @@ export default function DriverRides() {
         // Fallback to mock data if API not ready
         const mockRides = generateMockRides();
         setRides(mockRides);
-        toast.info('Using demo ride data');
+        toast('Using demo ride data');
       }
     } catch (err: any) {
       console.error('Fetch rides error:', err);
@@ -102,7 +102,7 @@ export default function DriverRides() {
       // Fallback to mock data
       const mockRides = generateMockRides();
       setRides(mockRides);
-      toast.info('Using demo ride data');
+      toast('Using demo ride data');
     } finally {
       setRefreshing(false);
       setLoading(false);

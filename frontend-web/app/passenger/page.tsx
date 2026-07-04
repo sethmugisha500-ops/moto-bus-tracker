@@ -1,7 +1,7 @@
 // app/passenger/page.tsx
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GoogleMap, Marker, DirectionsRenderer, useLoadScript, Circle, InfoWindow } from "@react-google-maps/api";
@@ -423,12 +423,11 @@ location: location && typeof window !== 'undefined' && (window as any).google ? 
           };
           setLocation(newLocation);
           setPickupCoords(newLocation);
-
-          if (window.google && directionsService.current) {
-            const geocoder = new google.maps.Geocoder();
+if (typeof window !== 'undefined' && (window as any).google && directionsService.current) {
+  const geocoder = new (window as any).google.maps.Geocoder();
             geocoder.geocode(
               { location: newLocation },
-              (results, status) => {
+              (results: { formatted_address: SetStateAction<string>; }[], status: google.maps.GeocoderStatus) => {
                 if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
                   setPickup(results[0].formatted_address);
                 }

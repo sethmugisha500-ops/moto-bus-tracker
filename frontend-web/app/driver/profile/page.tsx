@@ -9,7 +9,8 @@ import {
   Car, Settings, Edit, Save,
   X, Camera, Shield, CheckCircle,
   Star, DollarSign, Clock, Award,
-  AlertCircle, Loader2, RefreshCw
+  AlertCircle, Loader2, RefreshCw,
+  Wallet
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 

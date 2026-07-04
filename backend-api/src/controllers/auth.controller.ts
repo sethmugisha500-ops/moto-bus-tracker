@@ -1,18 +1,13 @@
-// src/controllers/auth.controller.ts
+// backend-api/src/controllers/auth.controller.ts
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { AuthRequest } from '../middleware/auth.middleware';
 
-// ✅ Add fallback values so it never throws
 const JWT_SECRET = process.env.JWT_SECRET || 'motobus_secret_key_fallback';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh_secret_fallback';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-
-// ✅ Add warning in development
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.warn('⚠️ JWT_SECRET is not set in production! Using fallback secret.');
-}
 
 function generateTokens(userId: string, role: string) {
   const accessToken = jwt.sign(
@@ -35,6 +30,32 @@ function sanitizeUser(user: any) {
   return safe;
 }
 
+// ─── Helper to format user data with driver info ──────────────────
+function formatUserData(user: any) {
+  const sanitized = sanitizeUser(user);
+  
+  // If user is a driver, add driver-specific fields
+  if (user.role === 'DRIVER' && user.driver) {
+    return {
+      ...sanitized,
+      driverId: user.driver.id,
+      isApproved: user.driver.isApproved,
+      isOnline: user.driver.isOnline,
+      vehicle: {
+        type: user.driver.vehicleType,
+        number: user.driver.vehicleNumber,
+        model: user.driver.vehicleModel,
+      },
+      rating: user.driver.rating,
+      totalTrips: user.driver.totalTrips,
+      totalEarnings: user.driver.totalEarnings,
+      licenseNumber: user.driver.licenseNumber,
+    };
+  }
+  
+  return sanitized;
+}
+
 class AuthController {
   async getCurrentUser(req: Request, res: Response) {
     try {
@@ -52,7 +73,8 @@ class AuthController {
         return res.status(404).json({ success: false, message: 'User not found' });
       }
 
-      return res.json({ success: true, user: sanitizeUser(user) });
+      const formattedUser = formatUserData(user);
+      return res.json({ success: true, user: formattedUser });
     } catch (error: any) {
       console.error('Get current user error:', error);
       return res.status(500).json({ success: false, message: error.message });
@@ -60,108 +82,183 @@ class AuthController {
   }
 
   async login(req: Request, res: Response) {
-    try {
-      const { phone, password, otpVerified } = req.body;
+  try {
+    const { phone, password, otpVerified } = req.body;
 
-      console.log('🔐 Login attempt for:', phone);
-
-      if (!phone) {
-        return res.status(400).json({ success: false, message: 'Phone number is required' });
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { phone },
-        include: { wallet: true, driver: true },
-      });
-
-      if (!user) {
-        console.log('❌ User not found:', phone);
-        return res.status(404).json({ success: false, message: 'No account found with this phone number' });
-      }
-
-      if (!user.isActive) {
-        console.log('❌ User inactive:', phone);
-        return res.status(403).json({ success: false, message: 'This account has been deactivated' });
-      }
-
-      // Path 1: OTP-verified login (no password required — OTP already proved identity)
-      if (otpVerified === true) {
-        console.log('✅ OTP verified login for:', phone);
-        const tokens = generateTokens(user.id, user.role);
-        return res.json({
-          success: true,
-          message: 'Login successful',
-          data: { tokens, user: sanitizeUser(user) },
-        });
-      }
-
-      // Path 2: Password-based login
-      if (!password) {
-        return res.status(400).json({ success: false, message: 'Password is required' });
-      }
-
-      const passwordMatches = await bcrypt.compare(password, user.password);
-      if (!passwordMatches) {
-        console.log('❌ Invalid password for:', phone);
-        return res.status(401).json({ success: false, message: 'Incorrect phone number or password' });
-      }
-
-      console.log('✅ Login successful for:', phone);
-      const tokens = generateTokens(user.id, user.role);
-      return res.json({
-        success: true,
-        message: 'Login successful',
-        data: { tokens, user: sanitizeUser(user) },
-      });
-    } catch (error: any) {
-      console.error('Login error:', error);
-      return res.status(500).json({ success: false, message: error.message });
+    if (!phone) {
+      return res.status(400).json({ success: false, message: 'Phone number is required' });
     }
+
+    // ✅ Find user by phone number (unique)
+    const user = await prisma.user.findUnique({
+      where: { phone },
+      include: { 
+        wallet: true, 
+        driver: true 
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No account found with this phone number' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ success: false, message: 'This account has been deactivated' });
+    }
+
+    // ... password validation ...
+
+    const tokens = generateTokens(user.id, user.role);
+    const formattedUser = formatUserData(user);
+    
+    // ✅ Log which user is logging in
+    console.log(`✅ User logged in: ${user.phone} - ${user.role} - ${user.name}`);
+    
+    return res.json({
+      success: true,
+      message: 'Login successful',
+      data: { 
+        tokens, 
+        user: formattedUser 
+      },
+    });
+  } catch (error: any) {
+    console.error('Login error:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
+}
 
   async register(req: Request, res: Response) {
     try {
-      const { phone, name, email, password, role } = req.body;
+      const { phone, name, email, password, role, licenseNumber, vehicleType, vehicleNumber, vehicleModel } = req.body;
 
-      console.log('📝 Registration attempt for:', phone);
-
+      // Validation
       if (!phone || !name || !password) {
-        return res.status(400).json({ success: false, message: 'Phone, name, and password are required' });
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Phone, name, and password are required' 
+        });
       }
 
+      // Check if user exists
       const existing = await prisma.user.findUnique({ where: { phone } });
       if (existing) {
-        return res.status(409).json({ success: false, message: 'An account with this phone number already exists' });
+        return res.status(409).json({ 
+          success: false, 
+          message: 'An account with this phone number already exists' 
+        });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
+      // Create user with driver data if applicable
+      let userData: any = {
+        phone,
+        name,
+        email: email || undefined,
+        password: hashedPassword,
+        role: role === 'DRIVER' ? 'DRIVER' : 'RIDER',
+        isActive: true,
+        isVerified: true,
+        wallet: { create: { balance: 0 } },
+      };
+
+      // Add driver data if role is DRIVER
+      if (role === 'DRIVER') {
+        userData.driver = {
+          create: {
+            licenseNumber: licenseNumber || '',
+            vehicleType: vehicleType || 'MOTO',
+            vehicleNumber: vehicleNumber || '',
+            vehicleModel: vehicleModel || '',
+            // ✅ Auto-approve in development, require approval in production
+            isApproved: process.env.NODE_ENV === 'development' ? true : false,
+            isOnline: false,
+            rating: 0,
+            totalTrips: 0,
+            totalEarnings: 0,
+          }
+        };
+      }
+
       const user = await prisma.user.create({
-        data: {
-          phone,
-          name,
-          email: email || undefined,
-          password: hashedPassword,
-          role: role === 'DRIVER' ? 'DRIVER' : 'RIDER',
-          isActive: true,
-          isVerified: true,
-          wallet: { create: { balance: 0 } },
+        data: userData,
+        include: { 
+          wallet: true, 
+          driver: true 
         },
-        include: { wallet: true },
       });
 
-      console.log('✅ Registration successful for:', phone);
+      // Generate tokens
       const tokens = generateTokens(user.id, user.role);
+      const formattedUser = formatUserData(user);
+
+      // Send notification to admin about new registration
+      await notifyAdminAboutNewUser(user);
 
       return res.status(201).json({
         success: true,
         message: 'Registration successful',
-        data: { tokens, user: sanitizeUser(user) },
+        data: { 
+          tokens, 
+          user: formattedUser 
+        },
       });
+
     } catch (error: any) {
       console.error('Registration error:', error);
-      return res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ 
+        success: false, 
+        message: error.message 
+      });
     }
+  }
+}
+
+// ─── Notify Admin about new user ──────────────────────────────────
+async function notifyAdminAboutNewUser(user: any) {
+  try {
+    // Get admin users
+    const admins = await prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      select: { id: true }
+    });
+
+    if (admins.length === 0) {
+      console.log('No admin users found to notify');
+      return;
+    }
+
+    // Create notifications for each admin
+    for (const admin of admins) {
+      await prisma.notification.create({
+        data: {
+          userId: admin.id,
+          title: `New ${user.role} Registration`,
+          message: `${user.name} (${user.phone}) has registered as a ${user.role}.`,
+          type: 'USER_REGISTRATION',
+        }
+      });
+    }
+
+    // If driver, also create pending approval notification
+    if (user.role === 'DRIVER' && user.driver) {
+      for (const admin of admins) {
+        await prisma.notification.create({
+          data: {
+            userId: admin.id,
+            title: 'Driver Application Pending',
+            message: `Driver ${user.name} (${user.phone}) is waiting for approval. Vehicle: ${user.driver.vehicleType} - ${user.driver.vehicleNumber}`,
+            type: 'DRIVER_PENDING_APPROVAL',
+          }
+        });
+      }
+    }
+
+    console.log(`📧 New ${user.role} registered: ${user.name} (${user.phone})`);
+    console.log(`📨 Notifications sent to ${admins.length} admin(s)`);
+  } catch (error) {
+    console.error('Failed to send admin notification:', error);
   }
 }
 

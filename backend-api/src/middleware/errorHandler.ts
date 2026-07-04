@@ -1,6 +1,8 @@
+// src/middleware/errorHandler.ts
 import { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { AuthRequest } from './auth.middleware';
+import { env } from '../config/env';
 
 export class AppError extends Error {
   statusCode: number;
@@ -20,7 +22,7 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): Response => {
-  // Log error with more context
+  // Log error
   console.error('❌ Error:', {
     message: err.message,
     stack: err.stack,
@@ -37,56 +39,45 @@ export const errorHandler = (
       success: false,
       message: err.message,
     };
-    
-    if (process.env.NODE_ENV === 'development') {
+
+    if (env.NODE_ENV === 'development') {
       response.stack = err.stack;
     }
-    
+
     return res.status(err.statusCode).json(response);
   }
 
-  // Handle Prisma known request errors
+  // Handle Prisma errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     switch (err.code) {
-      case 'P2002': // Unique constraint violation
+      case 'P2002':
         return res.status(409).json({
           success: false,
           message: `Duplicate field value: ${err.meta?.target || 'unique constraint'}`,
         });
-      case 'P2003': // Foreign key constraint violation
+      case 'P2003':
         return res.status(409).json({
           success: false,
           message: 'Related record not found',
         });
-      case 'P2025': // Record not found
+      case 'P2025':
         return res.status(404).json({
           success: false,
           message: 'Record not found',
         });
-      case 'P2012': // Missing required field
+      case 'P2012':
         return res.status(400).json({
           success: false,
           message: `Missing required field: ${err.meta?.field}`,
         });
       default:
-        console.error('Unhandled Prisma error:', err);
         return res.status(500).json({
           success: false,
-          message: process.env.NODE_ENV === 'production'
+          message: env.NODE_ENV === 'production'
             ? 'Database error occurred'
             : `Database error: ${err.message}`,
         });
     }
-  }
-
-  // Handle Prisma validation errors
-  if (err instanceof Prisma.PrismaClientValidationError) {
-    return res.status(400).json({
-      success: false,
-      message: process.env.NODE_ENV === 'production'
-        ? 'Invalid data provided'
-        : `Validation error: ${err.message}`,
-    });
   }
 
   // Handle JWT errors
@@ -104,34 +95,18 @@ export const errorHandler = (
     });
   }
 
-  // Handle bcrypt errors
-  if (err.name === 'BcryptError') {
-    return res.status(500).json({
-      success: false,
-      message: 'Error processing password',
-    });
-  }
-
-  // Handle rate limit errors
-  if ((err as any).type === 'rate-limit') {
-    return res.status(429).json({
-      success: false,
-      message: 'Too many requests, please try again later',
-    });
-  }
-
-  // Default error - never expose internal errors in production
+  // Default error
   console.error('Unhandled error:', err);
   return res.status(500).json({
     success: false,
-    message: process.env.NODE_ENV === 'production'
+    message: env.NODE_ENV === 'production'
       ? 'Internal server error'
       : err.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
 
-// Async wrapper to avoid try-catch in controllers
+// Async wrapper
 export const catchAsync = (fn: Function) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -146,7 +121,7 @@ export const notFound = (req: Request, res: Response): Response => {
   });
 };
 
-// Custom error factory functions
+// Error factories
 export const createError = (message: string, statusCode: number): AppError => {
   return new AppError(message, statusCode);
 };
@@ -165,16 +140,4 @@ export const forbidden = (message: string = 'Forbidden'): AppError => {
 
 export const notFoundError = (message: string = 'Not found'): AppError => {
   return new AppError(message, 404);
-};
-
-export const conflictError = (message: string = 'Conflict'): AppError => {
-  return new AppError(message, 409);
-};
-
-export const validationError = (message: string): AppError => {
-  return new AppError(message, 422);
-};
-
-export const internalError = (message: string = 'Internal server error'): AppError => {
-  return new AppError(message, 500);
 };

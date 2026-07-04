@@ -5,6 +5,7 @@ import http from 'http';
 import { Server as SocketServer } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
 
 dotenv.config();
 
@@ -12,7 +13,7 @@ const app = express();
 const server = http.createServer(app);
 const prisma = new PrismaClient();
 
-// CORS Configuration
+// ─── CORS Configuration ──────────────────────────────────────────────
 const getAllowedOrigins = () => {
   const origins = [
     'http://localhost:3000',
@@ -71,79 +72,54 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.set('trust proxy', 1);
 
-// Health check
+// ─── Health Check ──────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
+    environment: process.env.NODE_ENV || 'development',
     version: '1.0.0',
   });
 });
 
-app.get('/api/version', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({
-    version: '1.0.0',
-    environment: process.env.NODE_ENV,
+    status: 'OK',
     timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0',
   });
 });
 
-// ============================================
-// ROUTE IMPORTS
-// ============================================
-
+// ─── ROUTE IMPORTS ──────────────────────────────────────────────────
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/users';
 import busRoutes from './routes/buses';
-import ridesRoutes from './routes/rides'; // ← ADD THIS
+import ridesRoutes from './routes/rides';
+import supportRoutes from './routes/support';
+import landingRoutes from './routes/landing';
+import notificationRoutes from './routes/notifications';
+import otpRoutes from './routes/otp';
+import driverRoutes from './routes/drivers';
+import riderRoutes from './routes/riders';
+import adminRoutes from './routes/admin';
 
-// Optional routes
-let otpRoutes: any;
-let driverRoutes: any;
-let riderRoutes: any;
-let adminRoutes: any;
-
-try {
-  otpRoutes = require('./routes/otp').default || require('./routes/otp');
-} catch (e) {
-  otpRoutes = (req: any, res: any) => res.status(501).json({ message: 'OTP routes not implemented yet' });
-}
-
-try {
-  driverRoutes = require('./routes/drivers').default || require('./routes/drivers');
-} catch (e) {
-  driverRoutes = (req: any, res: any) => res.status(501).json({ message: 'Driver routes not implemented yet' });
-}
-
-try {
-  riderRoutes = require('./routes/riders').default || require('./routes/riders');
-} catch (e) {
-  riderRoutes = (req: any, res: any) => res.status(501).json({ message: 'Rider routes not implemented yet' });
-}
-
-try {
-  adminRoutes = require('./routes/admin').default || require('./routes/admin');
-} catch (e) {
-  adminRoutes = (req: any, res: any) => res.status(501).json({ message: 'Admin routes not implemented yet' });
-}
-
-// ============================================
-// MOUNT ROUTES
-// ============================================
+console.log('📦 Mounting routes...');
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/buses', busRoutes);
-app.use('/api/rides', ridesRoutes); // ← ADD THIS
+app.use('/api/rides', ridesRoutes);
 app.use('/api/otp', otpRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/riders', riderRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/landing', landingRoutes);
+app.use('/api/notifications', notificationRoutes);
 
-// ============================================
-// SOCKET.IO
-// ============================================
+console.log('✅ All routes mounted');
 
+// ─── SOCKET.IO ──────────────────────────────────────────────────────
 const io = new SocketServer(server, {
   cors: {
     origin: getAllowedOrigins(),
@@ -156,36 +132,358 @@ const io = new SocketServer(server, {
   pingInterval: 25000,
 });
 
-app.set('io', io);
+// ─── Socket.IO Authentication ──────────────────────────────────────
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  
+  if (!token) {
+    console.log('❌ Socket: No token provided');
+    return next(new Error('Authentication error: No token'));
+  }
 
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+    (socket as any).userId = decoded.id;
+    (socket as any).user = decoded;
+    console.log(`✅ Socket authenticated: ${decoded.id}`);
+    next();
+  } catch (error) {
+    console.log('❌ Socket: Invalid token');
+    return next(new Error('Authentication error: Invalid token'));
+  }
+});
+
+// ─── Store connected clients ──────────────────────────────────────
+const connectedClients = new Map();
+const driverSockets = new Map();
+const riderSockets = new Map();
+
+app.set('io', io);
+app.set('connectedClients', connectedClients);
+app.set('driverSockets', driverSockets);
+app.set('riderSockets', riderSockets);
+
+// ─── ✅ FIXED: Emit Helper ──────────────────────────────────────────
+const emitToRider = (riderId: string, event: string, data: any) => {
+  if (!riderId) {
+    console.log('❌ Cannot emit: riderId is empty');
+    return;
+  }
+  
+  console.log(`📤 Emitting ${event} to rider ${riderId}`);
+  
+  const rooms = [
+    riderId,
+    `user_${riderId}`,
+    `user-${riderId}`,
+    `rider_${riderId}`,
+    `rider-${riderId}`
+  ];
+  
+  try {
+    rooms.forEach(room => {
+      io.to(room).emit(event, data);
+      console.log(`  ✅ Emitted to room: ${room}`);
+    });
+    
+    // Also emit directly to connected sockets
+    io.fetchSockets().then((sockets) => {
+      let found = 0;
+      sockets.forEach((s: any) => {
+        if (s.userId === riderId) {
+          s.emit(event, data);
+          found++;
+          console.log(`  ✅ Emitted directly to socket: ${s.id}`);
+        }
+      });
+      if (found === 0) {
+        console.log(`  ⚠️ No connected sockets for rider ${riderId}`);
+      } else {
+        console.log(`  ✅ Found ${found} connected sockets for rider ${riderId}`);
+      }
+    }).catch((err) => {
+      console.log(`  ⚠️ Could not fetch sockets: ${err.message}`);
+    });
+  } catch (error) {
+    console.error(`❌ Error emitting ${event}:`, error);
+  }
+};
+
+app.set('emitToRider', emitToRider);
+
+// ─── Socket.IO Connection Handler ──────────────────────────────────
 io.on('connection', (socket) => {
-  console.log('🔌 New client connected:', socket.id);
-  
-  socket.on('join', (userId) => {
-    socket.join(`user_${userId}`);
-    console.log(`👤 User ${userId} joined room`);
+  const userId = (socket as any).userId;
+  console.log(`🟢 Socket connected: ${socket.id}, User: ${userId}`);
+
+  // ── Auto-join user rooms ──
+  if (userId) {
+    const rooms = [
+      userId,
+      `user_${userId}`,
+      `user-${userId}`,
+    ];
+    rooms.forEach(room => {
+      socket.join(room);
+      console.log(`📌 Auto-joined: ${room}`);
+    });
+  }
+
+  // ── Join user room ──
+  socket.on('join', (userId: string) => {
+    if (userId) {
+      const rooms = [
+        userId,
+        `user_${userId}`,
+        `user-${userId}`,
+      ];
+      rooms.forEach(room => {
+        socket.join(room);
+        console.log(`📌 Joined room: ${room}`);
+      });
+      connectedClients.set(socket.id, { userId, socketId: socket.id });
+      console.log(`👤 User ${userId} joined rooms`);
+    }
   });
-  
-  socket.on('join-driver', (driverId) => {
-    socket.join(`driver_${driverId}`);
-    console.log(`🚗 Driver ${driverId} joined room`);
+
+  // ── Join driver room ──
+  socket.on('join-driver', (driverId: string) => {
+    if (driverId) {
+      const rooms = [
+        driverId,
+        `user_${driverId}`,
+        `user-${driverId}`,
+        `driver_${driverId}`,
+        `driver-${driverId}`
+      ];
+      rooms.forEach(room => {
+        socket.join(room);
+        console.log(`📌 Joined driver room: ${room}`);
+      });
+      driverSockets.set(driverId, socket.id);
+      console.log(`🚗 Driver ${driverId} joined rooms`);
+    }
   });
-  
-  socket.on('join-rider', (riderId) => {
-    socket.join(`rider_${riderId}`);
-    console.log(`🚕 Rider ${riderId} joined room`);
+
+  // ── Join rider room ──
+  socket.on('join-rider', (riderId: string) => {
+    if (riderId) {
+      const rooms = [
+        riderId,
+        `user_${riderId}`,
+        `user-${riderId}`,
+        `rider_${riderId}`,
+        `rider-${riderId}`
+      ];
+      rooms.forEach(room => {
+        socket.join(room);
+        console.log(`📌 Joined rider room: ${room}`);
+      });
+      riderSockets.set(riderId, socket.id);
+      console.log(`🚕 Rider ${riderId} joined rooms`);
+    }
   });
-  
+
+  // ── Update driver location ──
+  socket.on('driver-location', async (data) => {
+    const { driverId, lat, lng, rideId } = data;
+    console.log(`📍 Driver ${driverId} location: ${lat}, ${lng}`);
+    
+    try {
+      await prisma.driver.update({
+        where: { id: driverId },
+        data: { currentLat: lat, currentLng: lng }
+      });
+      
+      if (rideId) {
+        const ride = await prisma.ride.findUnique({
+          where: { id: rideId },
+          select: { riderId: true }
+        });
+        
+        if (ride) {
+          emitToRider(ride.riderId, 'driver-location-update', {
+            driverId,
+            lat,
+            lng,
+            rideId
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error updating driver location:', error);
+    }
+  });
+
+  // ── Disconnect ──
   socket.on('disconnect', () => {
-    console.log('🔌 Client disconnected:', socket.id);
+    console.log(`🔴 Client disconnected: ${socket.id}`);
+    connectedClients.delete(socket.id);
+    
+    for (const [key, value] of driverSockets) {
+      if (value === socket.id) driverSockets.delete(key);
+    }
+    for (const [key, value] of riderSockets) {
+      if (value === socket.id) riderSockets.delete(key);
+    }
+  });
+
+  // ── Error handling ──
+  socket.on('error', (error) => {
+    console.error('Socket error:', error);
   });
 });
 
-// ============================================
-// ERROR HANDLERS
-// ============================================
+console.log('📡 WebSocket server initialized');
 
-// 404 handler
+// ─── Socket Stats Endpoint ──────────────────────────────────────────
+app.get('/api/socket-stats', (req, res) => {
+  try {
+    const sockets = io.sockets.sockets;
+    const users = new Set();
+    sockets.forEach((s: any) => {
+      if (s.userId) users.add(s.userId);
+    });
+    
+    res.json({
+      connected: true,
+      totalSockets: sockets.size,
+      uniqueUsers: users.size,
+      users: Array.from(users),
+      rooms: Array.from(io.sockets.adapter.rooms.keys())
+    });
+  } catch (error) {
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// ─── DEBUG: Socket connections ──────────────────────────────────────
+app.get('/api/debug/sockets', (req, res) => {
+  try {
+    const sockets = io.sockets.sockets;
+    const allRooms = io.sockets.adapter.rooms;
+    
+    const socketInfo: any[] = [];
+    sockets.forEach((socket: any) => {
+      socketInfo.push({
+        id: socket.id,
+        userId: socket.userId,
+        rooms: Array.from(socket.rooms)
+      });
+    });
+    
+    res.json({
+      success: true,
+      totalSockets: sockets.size,
+      totalRooms: allRooms.size,
+      sockets: socketInfo,
+      rooms: Array.from(allRooms.keys())
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: String(error) });
+  }
+});
+
+// ─── DEBUG: Pending rides ──────────────────────────────────────────
+app.get('/api/debug/rides', async (req, res) => {
+  try {
+    const rides = await prisma.ride.findMany({
+      where: { status: 'PENDING' },
+      include: {
+        rider: {
+          select: { id: true, name: true, phone: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+    
+    res.json({
+      success: true,
+      totalPending: rides.length,
+      rides: rides.map((r: any) => ({
+        id: r.id,
+        riderName: r.rider?.name || 'Unknown',
+        riderId: r.riderId,
+        status: r.status,
+        fare: r.fare,
+        pickupAddress: r.pickupAddress,
+        dropoffAddress: r.dropoffAddress,
+        createdAt: r.createdAt
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: String(error) });
+  }
+});
+
+// ─── DEBUG: Test emit to passenger ──────────────────────────────────
+app.post('/api/debug/emit-test', async (req, res) => {
+  try {
+    const { passengerId, driverName } = req.body;
+    
+    if (!passengerId) {
+      return res.status(400).json({
+        success: false,
+        message: 'passengerId required'
+      });
+    }
+    
+    console.log(`🧪 Manual emit test to passenger: ${passengerId}`);
+    
+    const testData = {
+      rideId: 'test-ride-' + Date.now(),
+      driver: {
+        id: 'test-driver-1',
+        driverId: 'test-driver-1',
+        name: driverName || 'Test Driver',
+        phone: '+250788123456',
+        vehicleNumber: 'RAB 123T',
+        vehicleType: 'MOTO',
+        rating: 4.8,
+        currentLat: -1.9441,
+        currentLng: 30.0619,
+        profilePhoto: null,
+      },
+      timestamp: new Date().toISOString()
+    };
+    
+    const emitToRider = req.app.get('emitToRider');
+    
+    if (emitToRider) {
+      emitToRider(passengerId, 'ride-accepted', testData);
+      emitToRider(passengerId, 'rideAccepted', testData);
+    }
+    
+    res.json({
+      success: true,
+      message: `Test emit sent to passenger ${passengerId}`
+    });
+    
+  } catch (error: any) {
+    console.error('❌ Test emit error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ─── DEBUG: Route test ──────────────────────────────────────────────
+app.get('/api/debug/routes', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Debug routes are working',
+    endpoints: [
+      'GET /api/debug/sockets',
+      'GET /api/debug/rides',
+      'POST /api/debug/emit-test',
+      'GET /api/debug/routes'
+    ]
+  });
+});
+
+// ─── 404 Handler ────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -193,7 +491,7 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler
+// ─── Global Error Handler ──────────────────────────────────────────
 app.use((err: any, req: any, res: any, next: any) => {
   console.error('❌ Error:', err);
   res.status(err.status || 500).json({
@@ -202,4 +500,4 @@ app.use((err: any, req: any, res: any, next: any) => {
   });
 });
 
-export { app, server, prisma, io };
+export { app, server, prisma, io, emitToRider };

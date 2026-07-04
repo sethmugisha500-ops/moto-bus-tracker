@@ -1,69 +1,98 @@
+// src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
+import { env } from '../config/env';
+import { AppError } from './errorHandler';
 
 export interface AuthRequest extends Request {
-    user?: {
-        id: string;
-        phone: string;
-        role: string;
-        name?: string;
-    };
+  user?: {
+    id: string;
+    phone: string;
+    role: string;
+    name?: string;
+  };
 }
 
-export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    try {
-        const authHeader = req.headers.authorization;
-        const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-        
-        if (!token) {
-            res.status(401).json({ success: false, message: 'Authentication required' });
-            return;
-        }
+export const authenticate = async (
+  req: AuthRequest, 
+  res: Response, 
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') 
+      ? authHeader.split(' ')[1] 
+      : null;
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
-        
-        const user = await prisma.user.findUnique({
-            where: { id: decoded.userId },
-            select: {
-                id: true,
-                phone: true,
-                name: true,
-                role: true,
-            }
-        });
-
-        if (!user) {
-            res.status(401).json({ success: false, message: 'User not found' });
-            return;
-        }
-
-        req.user = user;
-        next();
-    } catch (error: any) {
-        console.error('Auth error:', error.message);
-        res.status(401).json({ success: false, message: 'Invalid or expired token' });
-        return;
+    if (!token) {
+      throw new AppError('Authentication required', 401);
     }
+
+    const decoded = jwt.verify(token, env.JWT_SECRET) as any;
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        phone: true,
+        name: true,
+        role: true,
+      }
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 401);
+    }
+
+    req.user = user;
+    next();
+  } catch (error: any) {
+    console.error('Auth error:', error.message);
+    
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({ 
+        success: false, 
+        message: error.message 
+      });
+      return;
+    }
+
+    res.status(401).json({ 
+      success: false, 
+      message: 'Invalid or expired token' 
+    });
+  }
 };
 
-export const authorize = (...roles: string[]) => {
-    return (req: AuthRequest, res: Response, next: NextFunction): void => {
-        if (!req.user) {
-            res.status(401).json({ success: false, message: 'Authentication required' });
-            return;
-        }
+// ✅ Role-based authorization middleware
+export const requireRole = (...roles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ 
+        success: false, 
+        message: 'Authentication required' 
+      });
+      return;
+    }
 
-        if (!roles.includes(req.user.role)) {
-            res.status(403).json({ 
-                success: false, 
-                message: `Access denied. Required roles: ${roles.join(', ')}` 
-            });
-            return;
-        }
+    if (!roles.includes(req.user.role)) {
+      res.status(403).json({ 
+        success: false, 
+        message: `Access denied. Required roles: ${roles.join(', ')}` 
+      });
+      return;
+    }
 
-        next();
-    };
+    next();
+  };
 };
+
+// ✅ Convenience middleware for admin
+export const requireAdmin = requireRole('ADMIN');
+
+// ✅ Convenience middleware for driver
+export const requireDriver = requireRole('DRIVER', 'ADMIN');
+
+// ✅ Authorization helper
+export const authorize = requireRole;

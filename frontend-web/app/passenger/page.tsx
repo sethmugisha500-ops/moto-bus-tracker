@@ -406,8 +406,7 @@ export default function PassengerHome() {
     clearSuggestions,
   } = usePlacesAutocomplete({
     requestOptions: {
-      location: location ? new google.maps.LatLng(location.lat, location.lng) : undefined,
-      radius: 50000,
+location: location && typeof google !== 'undefined' ? new google.maps.LatLng(location.lat, location.lng) : undefined,      radius: 50000,
       componentRestrictions: { country: "rw" },
     },
     debounce: 300,

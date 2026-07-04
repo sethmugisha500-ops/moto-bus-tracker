@@ -90,7 +90,7 @@ export default function DriverEarnings() {
           // If API returns success: false, generate mock data
           const mockData = generateMockEarnings();
           setEarnings(mockData);
-          toast.info('Using demo earnings data');
+          toast('Using demo earnings data');
         }
       } else if (res.status === 401) {
         router.push('/login');
@@ -98,16 +98,14 @@ export default function DriverEarnings() {
         // API error - use mock data
         const mockData = generateMockEarnings();
         setEarnings(mockData);
-        toast.info('Using demo earnings data');
-      }
+toast('Using demo earnings data', { icon: 'ℹ️' });      }
     } catch (err: any) {
       console.error('Fetch earnings error:', err);
       setError(err.message || 'Failed to fetch earnings');
       // Use mock data on error
       const mockData = generateMockEarnings();
       setEarnings(mockData);
-      toast.info('Using demo earnings data');
-    } finally {
+toast('Using demo earnings data', { icon: 'ℹ️' });    } finally {
       setRefreshing(false);
       setLoading(false);
     }

@@ -427,7 +427,7 @@ if (typeof window !== 'undefined' && (window as any).google && directionsService
   const geocoder = new (window as any).google.maps.Geocoder();
             geocoder.geocode(
               { location: newLocation },
-              (results: { formatted_address: SetStateAction<string>; }[], status: google.maps.GeocoderStatus) => {
+              function (results: { formatted_address: SetStateAction<string>; }[], status: google.maps.GeocoderStatus) {
                 if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
                   setPickup(results[0].formatted_address);
                 }

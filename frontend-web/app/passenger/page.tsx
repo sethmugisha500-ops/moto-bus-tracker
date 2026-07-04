@@ -406,8 +406,7 @@ export default function PassengerHome() {
     clearSuggestions,
   } = usePlacesAutocomplete({
     requestOptions: {
-location: location && window.google ? new window.google.maps.LatLng(location.lat, location.lng) : undefined,      componentRestrictions: { country: "rw" },
-    },
+location: location && typeof window !== 'undefined' && (window as any).google ? new (window as any).google.maps.LatLng(location.lat, location.lng) : undefined,    },
     debounce: 300,
   });
 

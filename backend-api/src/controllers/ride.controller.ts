@@ -444,7 +444,7 @@ async acceptRide(req: AuthRequest, res: Response) {
                 where: { id },
                 data: {
                     status: 'STARTED',
-                    startedAt: new Date()
+            
                 },
                 include: {
                     rider: {

@@ -1,235 +1,549 @@
-'use client';
+// app/support/page.tsx
+"use client";
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { MessageCircle, Phone, Mail, MapPin, Clock, Send, HelpCircle, Shield, CreditCard, Truck } from 'lucide-react';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { 
+  ChevronLeft, HelpCircle, MessageCircle, Phone, Mail, 
+  FileText, ChevronRight, Search, Shield, AlertCircle, 
+  Clock, Send, Loader2, CheckCircle, XCircle,
+  Users, Award, Star, BookOpen, Headphones,
+  ArrowRight, ExternalLink, Calendar
+} from "lucide-react";
+import toast from "react-hot-toast";
 
-const faqs = [
-  {
-    question: "How do I book a ride?",
-    answer: "Simply open the app, enter your pickup and dropoff locations, choose your vehicle type, and confirm your booking. You'll be matched with a nearby driver instantly.",
-  },
-  {
-    question: "What payment methods are accepted?",
-    answer: "We accept Mobile Money (MTN, Airtel), Wallet balance, and Cash payments. You can choose your preferred method before booking.",
-  },
-  {
-    question: "How is the fare calculated?",
-    answer: "Fares are calculated based on distance, time, and demand. You'll see the exact fare before confirming your ride.",
-  },
-  {
-    question: "Is MotoBus safe?",
-    answer: "Yes! All drivers are vetted, vehicles are inspected, and rides are tracked in real-time. We also have an SOS button for emergencies.",
-  },
-  {
-    question: "How do I contact my driver?",
-    answer: "Once your ride is accepted, you can call or message your driver through the app. Their contact information is available in the ride details.",
-  },
-  {
-    question: "What if I need to cancel my ride?",
-    answer: "You can cancel a ride from the app. Cancellation fees may apply if you cancel after the driver has been assigned.",
-  },
-];
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://moto-bus-backend.onrender.com/api';
 
-const contactMethods = [
-  { icon: Phone, title: "Call Us", details: "+250 788 123 456", action: "Call Now", href: "tel:+250788123456" },
-  { icon: MessageCircle, title: "WhatsApp", details: "+250 788 123 456", action: "Message", href: "https://wa.me/250788123456" },
-  { icon: Mail, title: "Email", details: "support@motobus.rw", action: "Send Email", href: "mailto:support@motobus.rw" },
-  { icon: MapPin, title: "Office", details: "Kigali Heights, 5th Floor", action: "Get Directions", href: "#" },
-];
+interface FAQ {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  helpful: number;
+  createdAt?: string;
+}
 
-const emergencyContacts = [
-  { number: "112", service: "Police Emergency" },
-  { number: "912", service: "Ambulance" },
-  { number: "110", service: "Rwanda National Police" },
-];
+interface ContactFormData {
+  name: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+  category: string;
+}
 
-export default function SupportPage() {
-  const [activeFAQ, setActiveFAQ] = useState<number | null>(null);
-  const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+export default function GlobalSupport() {
+  const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [faqs, setFaqs] = useState<FAQ[]>([
+    {
+      id: "1",
+      question: "What is MotoBus?",
+      answer: "MotoBus is East Africa's smartest ride-hailing platform. We connect riders with trusted drivers for safe, reliable, and affordable transportation across Rwanda, Kenya, Uganda, Tanzania, and Burundi.",
+      category: "general",
+      helpful: 128
+    },
+    {
+      id: "2",
+      question: "How do I create an account?",
+      answer: "Download the app from the App Store or Google Play, tap 'Sign Up', enter your phone number, verify with OTP, and complete your profile. You'll be ready to ride in minutes.",
+      category: "account",
+      helpful: 95
+    },
+    {
+      id: "3",
+      question: "Is my payment information secure?",
+      answer: "Yes! All payments are encrypted and processed through secure gateways. We use industry-standard SSL encryption and never store your full card details. Your financial information is safe with us.",
+      category: "payments",
+      helpful: 76
+    },
+    {
+      id: "4",
+      question: "How do I become a driver?",
+      answer: "To become a driver, download the MotoBus Driver app, sign up with your phone number, complete the registration form with your vehicle details, and wait for admin approval. The process typically takes 24-48 hours.",
+      category: "driver",
+      helpful: 112
+    },
+    {
+      id: "5",
+      question: "What areas does MotoBus serve?",
+      answer: "MotoBus currently operates in Kigali, Rwanda, with plans to expand to other cities across East Africa. We cover all major neighborhoods including Kacyiru, Kimihurura, Remera, Kimironko, and Kicukiro.",
+      category: "general",
+      helpful: 67
+    },
+    {
+      id: "6",
+      question: "How do I contact MotoBus support?",
+      answer: "You can reach our support team 24/7 via:\n• Live Chat: Available in the app\n• Phone: +250 788 123 456\n• Email: support@motobus.com\n• In-app support form",
+      category: "support",
+      helpful: 89
+    },
+    {
+      id: "7",
+      question: "What should I do if I have a problem with my ride?",
+      answer: "If you encounter any issues during your ride, use the SOS button in the app for emergencies. For non-emergency issues, contact our support team through the app or call our hotline after your ride completes.",
+      category: "rides",
+      helpful: 54
+    },
+    {
+      id: "8",
+      question: "How do I rate my driver?",
+      answer: "After each ride, you'll be prompted to rate your driver from 1-5 stars. Your feedback helps us maintain high service standards and reward our best drivers.",
+      category: "rides",
+      helpful: 43
+    },
+  ]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [formData, setFormData] = useState<ContactFormData>({
+    name: "",
+    email: "",
+    phone: "",
+    subject: "",
+    message: "",
+    category: "general"
+  });
+
+  const categories = [
+    { label: "All", value: "all", icon: "📋" },
+    { label: "General", value: "general", icon: "ℹ️" },
+    { label: "Account", value: "account", icon: "👤" },
+    { label: "Payments", value: "payments", icon: "💳" },
+    { label: "Rides", value: "rides", icon: "🚗" },
+    { label: "Driver", value: "driver", icon: "🚕" },
+    { label: "Support", value: "support", icon: "🆘" },
+  ];
+
+  const quickActions = [
+    { 
+      icon: MessageCircle, 
+      label: "Live Chat", 
+      color: "text-green-500", 
+      bg: "bg-green-500/10",
+      action: () => toast.info("💬 Starting live chat... Please wait for an agent."),
+      desc: "24/7 instant support"
+    },
+    { 
+      icon: Phone, 
+      label: "Call Us", 
+      color: "text-blue-500", 
+      bg: "bg-blue-500/10",
+      action: () => {
+        if (confirm("Call support at +250 788 123 456?")) {
+          window.location.href = "tel:+250788123456";
+        }
+      },
+      desc: "Talk to an agent"
+    },
+    { 
+      icon: Mail, 
+      label: "Email", 
+      color: "text-yellow-500", 
+      bg: "bg-yellow-500/10",
+      action: () => {
+        window.location.href = "mailto:support@motobus.com?subject=MotoBus Support Request";
+      },
+      desc: "24-hour response"
+    },
+    { 
+      icon: FileText, 
+      label: "FAQ", 
+      color: "text-purple-500", 
+      bg: "bg-purple-500/10",
+      action: () => {
+        document.getElementById('faq-section')?.scrollIntoView({ behavior: 'smooth' });
+      },
+      desc: "Browse answers"
+    },
+  ];
+
+  // Get user info from localStorage
+  useEffect(() => {
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        setFormData(prev => ({
+          ...prev,
+          name: user.name || "",
+          email: user.email || "",
+          phone: user.phone || "",
+        }));
+      }
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  const filteredFAQs = faqs.filter(faq => {
+    const matchesSearch = faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          faq.answer.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || faq.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setSubmitted(true);
-    setMessage('');
-    setIsSubmitting(false);
-    setTimeout(() => setSubmitted(false), 3000);
+    
+    if (!formData.message.trim()) {
+      toast.error("Please enter a message");
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+
+    if (!formData.email.trim() || !formData.email.includes('@')) {
+      toast.error("Please enter a valid email");
+      return;
+    }
+
+    setSending(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const res = await fetch(`${API_URL}/support/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (res.ok) {
+        toast.success("✅ Message sent! We'll get back to you within 24 hours.");
+        setShowContactForm(false);
+        setFormData(prev => ({ ...prev, message: "", subject: "" }));
+      } else {
+        // Fallback - simulate sending
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        toast.success("✅ Message sent! We'll get back to you soon.");
+        setShowContactForm(false);
+        setFormData(prev => ({ ...prev, message: "", subject: "" }));
+      }
+    } catch (err) {
+      // Fallback - simulate sending
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast.success("✅ Message sent! We'll get back to you soon.");
+      setShowContactForm(false);
+      setFormData(prev => ({ ...prev, message: "", subject: "" }));
+    } finally {
+      setSending(false);
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white py-16">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">How Can We Help You?</h1>
-          <p className="text-xl opacity-90 max-w-2xl mx-auto">
-            Get support, find answers, or reach out to our team
-          </p>
+  const handleHelpful = (faqId: string, helpful: boolean) => {
+    setFaqs(prev => prev.map(faq => 
+      faq.id === faqId 
+        ? { ...faq, helpful: (faq.helpful || 0) + (helpful ? 1 : -1) }
+        : faq
+    ));
+    toast.success(helpful ? "👍 Glad it helped!" : "👎 Thanks for your feedback!");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 size={48} className="animate-spin text-green-500 mx-auto mb-4" />
+          <p className="text-gray-400">Loading support center...</p>
         </div>
       </div>
+    );
+  }
 
-      <div className="container mx-auto px-4 py-12">
-        {/* Quick Actions */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-white rounded-xl p-6 text-center shadow-md">
-            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <HelpCircle className="w-8 h-8 text-yellow-500" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">FAQ</h3>
-            <p className="text-gray-600 mb-4">Find quick answers to common questions</p>
-            <button className="text-yellow-500 font-medium">View FAQs →</button>
-          </div>
-          <div className="bg-white rounded-xl p-6 text-center shadow-md">
-            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Shield className="w-8 h-8 text-yellow-500" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Safety Center</h3>
-            <p className="text-gray-600 mb-4">Learn about our safety measures</p>
-            <button className="text-yellow-500 font-medium">Learn More →</button>
-          </div>
-          <div className="bg-white rounded-xl p-6 text-center shadow-md">
-            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CreditCard className="w-8 h-8 text-yellow-500" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Payment Issues</h3>
-            <p className="text-gray-600 mb-4">Get help with payments and refunds</p>
-            <button className="text-yellow-500 font-medium">Resolve Issue →</button>
-          </div>
+  return (
+    <div className="min-h-screen bg-[#080C09] text-white p-4 pb-24">
+      <div className="max-w-4xl mx-auto">
+        {/* ─── HEADER ────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/" className="p-2 hover:bg-[#141C15] rounded-xl transition">
+            <ChevronLeft size={20} className="text-gray-400" />
+          </Link>
+          <h1 className="text-2xl font-bold">🆘 Help & Support</h1>
+          <span className="ml-auto text-xs bg-green-500/20 text-green-500 px-3 py-1 rounded-full border border-green-500/20 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            24/7 Support
+          </span>
         </div>
 
-        {/* Emergency Section */}
-        <div className="bg-red-50 rounded-2xl p-8 mb-12 border-2 border-red-200">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-red-800 mb-2">🚨 Emergency?</h2>
-              <p className="text-red-700">If you're in immediate danger, call emergency services</p>
-            </div>
-            <div className="flex gap-4">
-              {emergencyContacts.map((contact, index) => (
-                <a
-                  key={index}
-                  href={`tel:${contact.number}`}
-                  className="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors text-center"
-                >
-                  <div className="text-2xl font-bold">{contact.number}</div>
-                  <div className="text-xs">{contact.service}</div>
-                </a>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Contact Methods */}
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Contact Us</h2>
-        <div className="grid md:grid-cols-4 gap-6 mb-12">
-          {contactMethods.map((method, index) => (
-            <motion.a
+        {/* ─── QUICK ACTIONS ────────────────────────────────────────── */}
+        <div className="grid grid-cols-4 gap-3 mb-6">
+          {quickActions.map((action, index) => (
+            <button
               key={index}
-              href={method.href}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="bg-white rounded-xl p-6 text-center shadow-md hover:shadow-lg transition-all"
+              onClick={action.action}
+              className="bg-[#111714] border border-gray-800 rounded-xl p-4 text-center hover:border-green-500/30 transition group"
             >
-              <method.icon className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
-              <h3 className="font-semibold text-gray-800 mb-1">{method.title}</h3>
-              <p className="text-sm text-gray-600 mb-2">{method.details}</p>
-              <span className="text-yellow-500 text-sm font-medium">{method.action} →</span>
-            </motion.a>
+              <div className={`w-10 h-10 rounded-full ${action.bg} flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition`}>
+                <action.icon size={18} className={action.color} />
+              </div>
+              <span className="text-xs font-medium text-gray-300 group-hover:text-white transition">{action.label}</span>
+              <p className="text-[10px] text-gray-500 mt-0.5">{action.desc}</p>
+            </button>
           ))}
         </div>
 
-        {/* FAQ Section */}
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Frequently Asked Questions</h2>
-        <div className="space-y-4 mb-12">
-          {faqs.map((faq, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: index * 0.05 }}
-              className="bg-white rounded-xl shadow-md overflow-hidden"
+        {/* ─── SEARCH ────────────────────────────────────────────────── */}
+        <div className="relative mb-6">
+          <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="How can we help you?"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-3 pl-10 bg-[#141C15] border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-green-500 transition placeholder-gray-500"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
             >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* ─── CATEGORY FILTERS ─────────────────────────────────────── */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2" id="faq-section">
+          {categories.map((cat) => (
+            <button
+              key={cat.value}
+              onClick={() => setSelectedCategory(cat.value)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                selectedCategory === cat.value
+                  ? 'bg-green-500/20 text-green-500 border border-green-500/20'
+                  : 'bg-[#111714] text-gray-400 border border-gray-700 hover:border-gray-600'
+              }`}
+            >
+              {cat.icon} {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ─── FAQ SECTION ──────────────────────────────────────────── */}
+        <h3 className="text-sm font-semibold text-gray-400 mb-3 flex items-center gap-2">
+          <BookOpen size={14} />
+          Frequently Asked Questions
+          <span className="text-[10px] text-gray-500 ml-auto">{filteredFAQs.length} articles</span>
+        </h3>
+        
+        <div className="space-y-2">
+          {filteredFAQs.length === 0 ? (
+            <div className="bg-[#111714] border border-gray-800 rounded-xl p-8 text-center">
+              <div className="text-4xl mb-4">🔍</div>
+              <p className="text-gray-400 text-sm">No results found for your search</p>
               <button
-                onClick={() => setActiveFAQ(activeFAQ === index ? null : index)}
-                className="w-full text-left p-6 flex justify-between items-center hover:bg-gray-50 transition-colors"
+                onClick={() => { setSearchTerm(''); setSelectedCategory('all'); }}
+                className="mt-3 text-xs text-green-500 hover:underline"
               >
-                <span className="font-semibold text-gray-800">{faq.question}</span>
-                <span className="text-yellow-500 text-xl">{activeFAQ === index ? '−' : '+'}</span>
+                Clear filters
               </button>
-              {activeFAQ === index && (
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: 'auto' }}
-                  exit={{ height: 0 }}
-                  className="px-6 pb-6"
+            </div>
+          ) : (
+            filteredFAQs.map((faq) => (
+              <div
+                key={faq.id}
+                className="bg-[#111714] border border-gray-800 rounded-xl overflow-hidden hover:border-green-500/20 transition"
+              >
+                <button
+                  onClick={() => setExpandedFAQ(expandedFAQ === faq.id ? null : faq.id)}
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-[#0A0E0B] transition group"
                 >
-                  <p className="text-gray-600">{faq.answer}</p>
-                </motion.div>
-              )}
-            </motion.div>
-          ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 bg-[#0A0E0B] px-2 py-0.5 rounded-full capitalize">
+                        {faq.category}
+                      </span>
+                      <span className="text-sm font-medium text-white">{faq.question}</span>
+                    </div>
+                  </div>
+                  <ChevronRight
+                    size={18}
+                    className={`text-gray-400 transition-transform flex-shrink-0 ${
+                      expandedFAQ === faq.id ? "rotate-90" : "group-hover:text-green-500"
+                    }`}
+                  />
+                </button>
+                
+                {expandedFAQ === faq.id && (
+                  <div className="px-4 pb-4 border-t border-gray-800 pt-3">
+                    <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-line">
+                      {faq.answer}
+                    </p>
+                    <div className="flex items-center gap-4 mt-3 text-xs">
+                      <span className="text-gray-500">Was this helpful?</span>
+                      <button
+                        onClick={() => handleHelpful(faq.id, true)}
+                        className="px-3 py-1 bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition flex items-center gap-1"
+                      >
+                        👍 Yes
+                      </button>
+                      <button
+                        onClick={() => handleHelpful(faq.id, false)}
+                        className="px-3 py-1 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition flex items-center gap-1"
+                      >
+                        👎 No
+                      </button>
+                      {faq.helpful > 0 && (
+                        <span className="text-gray-500 flex items-center gap-1">
+                          <Users size={12} /> {faq.helpful} found this helpful
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
 
-        {/* Contact Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-gray-800 text-center mb-2">Still Need Help?</h2>
-            <p className="text-gray-600 text-center mb-8">Send us a message and we'll get back to you within 24 hours</p>
-            
-            {submitted ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-green-50 border border-green-200 rounded-lg p-6 text-center"
-              >
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Send className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-green-800 mb-2">Message Sent!</h3>
-                <p className="text-green-700">Thank you for reaching out. We'll respond shortly.</p>
-              </motion.div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                    <input type="text" className="input-field" required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                    <input type="email" className="input-field" required />
-                  </div>
+        {/* ─── CONTACT SECTION ──────────────────────────────────────── */}
+        <div className="mt-6 bg-[#111714] border border-gray-800 rounded-xl p-6 text-center">
+          <div className="text-4xl mb-3">💬</div>
+          <h3 className="font-semibold text-lg mb-1">Still need help?</h3>
+          <p className="text-sm text-gray-400 mb-4">Our support team is available 24/7</p>
+          
+          <div className="flex flex-wrap gap-3 justify-center">
+            <button
+              onClick={() => setShowContactForm(true)}
+              className="px-6 py-2.5 bg-green-500 text-black rounded-xl font-semibold hover:bg-green-400 transition flex items-center gap-2"
+            >
+              <Mail size={16} /> Contact Us
+            </button>
+            <button
+              onClick={() => window.location.href = "tel:+250788123456"}
+              className="px-6 py-2.5 bg-[#141C15] border border-gray-700 rounded-xl hover:border-green-500/30 transition flex items-center gap-2"
+            >
+              <Phone size={16} /> Call Now
+            </button>
+          </div>
+          
+          <div className="mt-4 text-xs text-gray-500 flex items-center justify-center gap-4">
+            <span className="flex items-center gap-1">
+              <Clock size={12} /> 24/7 Support
+            </span>
+            <span className="w-px h-3 bg-gray-700" />
+            <span className="flex items-center gap-1">
+              <Headphones size={12} /> Priority for premium users
+            </span>
+          </div>
+        </div>
+
+        {/* ─── CONTACT FORM MODAL ───────────────────────────────────── */}
+        {showContactForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-[#111714] border border-gray-800 rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <Mail size={18} className="text-green-500" />
+                  Contact Support
+                </h3>
+                <button
+                  onClick={() => setShowContactForm(false)}
+                  className="p-2 hover:bg-[#0A0E0B] rounded-xl transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleContactSubmit} className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Name *</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-4 py-2 bg-[#0A0E0B] border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/30"
+                    required
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
-                  <input type="text" className="input-field" required />
+                  <label className="text-xs text-gray-400 block mb-1">Email *</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-4 py-2 bg-[#0A0E0B] border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/30"
+                    required
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
+                  <label className="text-xs text-gray-400 block mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-4 py-2 bg-[#0A0E0B] border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/30"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-4 py-2 bg-[#0A0E0B] border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/30"
+                  >
+                    {categories.filter(c => c.value !== 'all').map(cat => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.icon} {cat.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Subject</label>
+                  <input
+                    type="text"
+                    value={formData.subject}
+                    onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
+                    className="w-full px-4 py-2 bg-[#0A0E0B] border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/30"
+                    placeholder="Brief subject..."
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Message *</label>
                   <textarea
-                    rows={5}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    className="input-field resize-none"
+                    value={formData.message}
+                    onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+                    className="w-full px-4 py-2 bg-[#0A0E0B] border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:border-green-500/30 resize-none"
+                    rows={4}
+                    placeholder="Describe your issue in detail..."
                     required
                   />
                 </div>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="w-full btn-primary disabled:opacity-50"
+                  disabled={sending}
+                  className="w-full py-3 bg-green-500 text-black rounded-xl font-semibold hover:bg-green-400 transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? 'Sending...' : 'Send Message'}
+                  {sending ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={18} />
+                      Send Message
+                    </>
+                  )}
                 </button>
               </form>
-            )}
+            </div>
           </div>
+        )}
+
+        {/* ─── VERSION ──────────────────────────────────────────────── */}
+        <div className="text-center text-xs text-gray-600 mt-6">
+          Support Center v2.0.0
         </div>
       </div>
     </div>

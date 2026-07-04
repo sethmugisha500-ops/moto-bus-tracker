@@ -1,8 +1,14 @@
+// app/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://moto-bus-backend.onrender.com/api';
+
+// ─── Static Data ────────────────────────────────────────────────────
 const STATIC_STATS = {
   dailyRides: 24800,
   activeDrivers: 680,
@@ -44,10 +50,12 @@ const PAYMENTS = [
   { icon: "💵", name: "Cash",          sub: "Always available",     popular: false },
 ];
 
+// ─── Counter Component ──────────────────────────────────────────────
 function Counter({ end, suffix = "" }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const started = useRef(false);
+  
   useEffect(() => {
     const obs = new IntersectionObserver(([e]) => {
       if (e.isIntersecting && !started.current) {
@@ -61,26 +69,86 @@ function Counter({ end, suffix = "" }: { end: number; suffix?: string }) {
         requestAnimationFrame(tick);
       }
     }, { threshold: 0.3 });
+    
     if (ref.current) obs.observe(ref.current);
     return () => obs.disconnect();
   }, [end]);
+  
   return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
 }
 
+// ─── Main Component ─────────────────────────────────────────────────
 export default function Home() {
+  const router = useRouter();
   const [stats, setStats] = useState(STATIC_STATS);
   const [activeCountry, setActiveCountry] = useState(0);
   const [scrollY, setScrollY] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/landing/stats")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => d && setStats(d))
-      .catch(() => {});
+    // ── Fetch stats from API ──
+    const fetchStats = async () => {
+      try {
+        const res = await fetch(`${API_URL}/landing/stats`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setStats(data.stats);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+        // Keep using static stats
+      }
+    };
+    fetchStats();
+
+    // ── Check login status ──
+    const token = localStorage.getItem('token');
+    if (token) {
+      setIsLoggedIn(true);
+      try {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+          const user = JSON.parse(userData);
+          setUserRole(user.role?.toUpperCase() || null);
+        }
+      } catch {}
+    }
+
+    // ── Scroll handler ──
     const onScroll = () => setScrollY(window.scrollY);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // ─── Handle Logout ─────────────────────────────────────────────────
+  const handleLogout = () => {
+    if (confirm('Are you sure you want to logout?')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('refreshToken');
+      setIsLoggedIn(false);
+      setUserRole(null);
+      toast.success('Logged out successfully');
+      router.push('/');
+    }
+  };
+
+  // ─── Get Dashboard Link ────────────────────────────────────────────
+  const getDashboardLink = () => {
+    if (userRole === 'ADMIN') return '/admin/dashboard';
+    if (userRole === 'DRIVER') return '/driver/dashboard';
+    return '/passenger';
+  };
+
+  // ─── Get Dashboard Label ──────────────────────────────────────────
+  const getDashboardLabel = () => {
+    if (userRole === 'ADMIN') return 'Admin Dashboard';
+    if (userRole === 'DRIVER') return 'Driver Dashboard';
+    return 'My Dashboard';
+  };
 
   return (
     <>
@@ -253,30 +321,43 @@ export default function Home() {
         @media(max-width:600px){.nav{padding:0 20px}.nav-links{display:none}.stats-bar{grid-template-columns:1fr 1fr}.feat-grid{grid-template-columns:1fr}.ride-grid{grid-template-columns:1fr 1fr}.cc-grid{grid-template-columns:repeat(2,1fr)}.footer-top{grid-template-columns:1fr}.cta-inner{padding:36px 24px}.cta-wrap{padding:0 16px;margin-top:60px}}
       `}</style>
 
-      {/* NAV */}
+      {/* ─── NAV ────────────────────────────────────────────────────── */}
       <nav className={`nav${scrollY > 20 ? " sc" : ""}`}>
         <Link href="/" className="nav-logo">
           <div className="ldot" />
           MotoBus
         </Link>
         <ul className="nav-links">
-          {["Features","Coverage","Rides","Operators"].map(l => (
+          {["Features","Coverage","Rides"].map(l => (
             <li key={l}><a href={`#${l.toLowerCase()}`}>{l}</a></li>
           ))}
         </ul>
         <div className="nav-r">
-          <Link href="/login"><button className="btn btn-o">Sign in</button></Link>
-          <Link href="/passenger"><button className="btn btn-g">Book a ride</button></Link>
+          {isLoggedIn ? (
+            <>
+              <Link href={getDashboardLink()}>
+                <button className="btn btn-g">{getDashboardLabel()}</button>
+              </Link>
+              <button onClick={handleLogout} className="btn btn-o" style={{padding: "11px 16px"}}>
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link href="/login"><button className="btn btn-o">Sign in</button></Link>
+              <Link href="/register"><button className="btn btn-g">Sign up</button></Link>
+            </>
+          )}
         </div>
       </nav>
 
-      {/* HERO */}
+      {/* ─── HERO ────────────────────────────────────────────────────── */}
       <section className="hero">
         <div className="orb" style={{width:700,height:700,top:-200,right:-200,background:"rgba(0,194,111,0.07)"}} />
         <div className="orb" style={{width:500,height:500,bottom:-100,left:-100,background:"rgba(255,107,53,0.05)"}} />
         <div className="orb" style={{width:300,height:300,top:"40%",left:"10%",background:"rgba(0,194,111,0.04)"}} />
 
-        {/* Phone */}
+        {/* Phone Mockup */}
         <div className="phone-float">
           <div className="phone-shell">
             <div className="phone-bar"><span>9:41</span><span style={{fontSize:9}}>▪▪▪</span></div>
@@ -305,7 +386,7 @@ export default function Home() {
                 <div className="rp"><div className="rp-e">🚌</div><div className="rp-l">Bus</div><div className="rp-p">300+</div></div>
               </div>
               <div className="pb-fare"><span className="pb-fl">Estimated fare</span><span className="pb-fv">RWF 1,800</span></div>
-              <button className="pb-bk">Book now →</button>
+              <Link href="/passenger"><button className="pb-bk">Book now →</button></Link>
             </div>
             <div className="pnav">
               <div className="pni on"><div className="pni-i">⏱</div><div className="pni-l">Ride</div></div>
@@ -354,7 +435,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* COVERAGE */}
+      {/* ─── COVERAGE ────────────────────────────────────────────────── */}
       <section className="sec" id="coverage" style={{paddingTop:60}}>
         <div className="sec-lbl">Coverage</div>
         <h2 className="sec-title">Built for East Africa</h2>
@@ -371,7 +452,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FEATURES */}
+      {/* ─── FEATURES ────────────────────────────────────────────────── */}
       <section className="sec" id="features" style={{paddingTop:40}}>
         <div className="sec-lbl">Why MotoBus wins</div>
         <h2 className="sec-title">Every YEGO weakness,<br/>fixed.</h2>
@@ -388,7 +469,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* RIDE TYPES */}
+      {/* ─── RIDE TYPES ──────────────────────────────────────────────── */}
       <section className="sec" id="rides" style={{paddingTop:40}}>
         <div className="sec-lbl">Services</div>
         <h2 className="sec-title">Every way to move</h2>
@@ -405,7 +486,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* PAYMENTS STRIP */}
+      {/* ─── PAYMENTS STRIP ──────────────────────────────────────────── */}
       <div className="pay-strip">
         <div className="pay-inner">
           <div>
@@ -427,7 +508,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* CTA */}
+      {/* ─── CTA ──────────────────────────────────────────────────────── */}
       <div className="cta-wrap">
         <div className="cta-inner">
           <div style={{position:"relative",zIndex:1}}>
@@ -435,13 +516,17 @@ export default function Home() {
             <p className="cta-sub">Get your account in 60 seconds. Operators get a full fleet dashboard — free for the first 30 days.</p>
           </div>
           <div className="cta-acts">
-            <Link href="/register"><button className="btn btn-g lg">Create free account</button></Link>
+            <Link href={isLoggedIn ? getDashboardLink() : "/register"}>
+              <button className="btn btn-g lg">
+                {isLoggedIn ? "Go to Dashboard" : "Create free account"}
+              </button>
+            </Link>
             <Link href="/admin"><button className="btn btn-o lg">Operator demo →</button></Link>
           </div>
         </div>
       </div>
 
-      {/* FOOTER */}
+      {/* ─── FOOTER ──────────────────────────────────────────────────── */}
       <footer className="footer">
         <div className="footer-top">
           <div className="ft-brand">
@@ -452,20 +537,23 @@ export default function Home() {
             <p>East Africa&apos;s smartest ride-hailing platform. Real-time tracking, instant payments, fleet intelligence — from Kigali to Nairobi.</p>
           </div>
           {[
-            {title:"Riders",    links:["Book a ride","Track my ride","Wallet","Safety center"]},
-            {title:"Operators", links:["Fleet dashboard","Driver management","Analytics","API docs"]},
-            {title:"Company",   links:["About","Careers","Privacy","Contact"]},
+            {title:"Riders",    links:[{label:"Book a ride", href:"/passenger"},{label:"Track my ride", href:"/passenger"},{label:"Wallet", href:"/wallet"},{label:"Safety center", href:"/support"}]},
+            {title:"Operators", links:[{label:"Fleet dashboard", href:"/admin"},{label:"Driver management", href:"/admin/drivers"},{label:"Analytics", href:"/admin/analytics"},{label:"Support", href:"/support"}]},
+            {title:"Company",   links:[{label:"About", href:"/about"},{label:"Careers", href:"/careers"},{label:"Privacy", href:"/privacy"},{label:"Contact", href:"/support/contact"}]},
           ].map(col => (
             <div className="ft-col" key={col.title}>
               <h4>{col.title}</h4>
-              <ul>{col.links.map(l => <li key={l}><a href="#">{l}</a></li>)}</ul>
+              <ul>{col.links.map(l => <li key={l.label}><Link href={l.href}>{l.label}</Link></li>)}</ul>
             </div>
           ))}
         </div>
         <div className="footer-bot">
           <span>© 2026 MotoBus Ltd. · Kigali, Rwanda 🇷🇼</span>
           <div className="socials">
-            {["tw","in","fb","ig"].map(s => <a key={s} href="#" className="soc">{s}</a>)}
+            <a href="#" className="soc">𝕏</a>
+            <a href="#" className="soc">in</a>
+            <a href="#" className="soc">fb</a>
+            <a href="#" className="soc">ig</a>
           </div>
         </div>
       </footer>

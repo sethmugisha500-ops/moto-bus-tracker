@@ -1,41 +1,55 @@
+// lib/api.ts
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://moto-bus-backend.onrender.com/api';
 
-export const apiClient = axios.create({
+export const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
+  timeout: 30000,
 });
 
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
-        const { token } = response.data;
-        localStorage.setItem('token', token);
-        originalRequest.headers.Authorization = `Bearer ${token}`;
-        return apiClient(originalRequest);
-      } catch (refreshError) {
-        localStorage.clear();
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
+// Request interceptor - add token
+api.interceptors.request.use(
+  (config) => {
+    // Get token from localStorage (client-side only)
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
     }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor - handle errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!error.response) {
+      console.error('❌ Network Error - Make sure backend is running');
+      return Promise.reject(new Error('Cannot connect to server. Please check your connection.'));
+    }
+    
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Redirect to login if not already there
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
+
+export default api;

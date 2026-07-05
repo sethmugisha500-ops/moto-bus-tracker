@@ -10,6 +10,11 @@ router.use((req: Request, res: Response, next) => {
   authenticate(req as AuthRequest, res, next);
 });
 
+// ─── ✅ NEW: Stats Route ──────────────────────────────────────────────
+router.get('/stats', (req: Request, res: Response) => {
+  adminController.getDashboardStats(req as AuthRequest, res);
+});
+
 // ─── Admin Routes ──────────────────────────────────────────────────
 router.get('/dashboard', (req: Request, res: Response) => {
   adminController.getDashboardStats(req as AuthRequest, res);

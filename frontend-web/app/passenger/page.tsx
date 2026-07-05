@@ -409,53 +409,53 @@ export default function PassengerHome() {
 location: location && typeof window !== 'undefined' && (window as any).google ? new (window as any).google.maps.LatLng(location.lat, location.lng) : undefined,    },
     debounce: 300,
   });
+// ─── GPS Location ──────────────────────────────────────────────────
+useEffect(() => {
+  if (!isAuthenticated) return;
 
-  // ─── GPS Location ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isAuthenticated) return;
+  if ("geolocation" in navigator) {
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const newLocation = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        };
+        setLocation(newLocation);
+        setPickupCoords(newLocation);
 
-    if ("geolocation" in navigator) {
-      const watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const newLocation = {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-          };
-          setLocation(newLocation);
-          setPickupCoords(newLocation);
-if (typeof window !== 'undefined' && (window as any).google && directionsService.current) {
-  const geocoder = new (window as any).google.maps.Geocoder();
-            geocoder.geocode(
-              { location: newLocation },
-              function (results: { formatted_address: SetStateAction<string>; }[], status: google.maps.GeocoderStatus) {
-                if (status === google.maps.GeocoderStatus.OK && results && results[0]) {
-                  setPickup(results[0].formatted_address);
-                }
+        if (typeof window !== 'undefined' && (window as any).google && directionsService.current) {
+          const geocoder = new (window as any).google.maps.Geocoder();
+          geocoder.geocode(
+            { location: newLocation },
+            (results: { formatted_address: SetStateAction<string>; }[], status: any) => {
+              if (status === (window as any).google.maps.GeocoderStatus.OK && results && results[0]) {
+                setPickup(results[0].formatted_address);
               }
-            );
-          }
+            }
+          );
+        }
 
-          fetchNearbyDrivers(newLocation);
-        },
-        () => {
-          setLocation(defaultCenter);
-          setPickupCoords(defaultCenter);
-          fetchNearbyDrivers(defaultCenter);
-          toast.error("Unable to get your location. Using default location.");
-        },
-        { enableHighAccuracy: true, maximumAge: 10000 }
-      );
+        fetchNearbyDrivers(newLocation);
+      },
+      () => {
+        setLocation(defaultCenter);
+        setPickupCoords(defaultCenter);
+        fetchNearbyDrivers(defaultCenter);
+        toast.error("Unable to get your location. Using default location.");
+      },
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    );
 
-      return () => {
-        if (watchId) navigator.geolocation.clearWatch(watchId);
-      };
-    } else {
-      setLocation(defaultCenter);
-      setPickupCoords(defaultCenter);
-      fetchNearbyDrivers(defaultCenter);
-      toast.error("Geolocation is not supported by your browser.");
-    }
-  }, [isAuthenticated]);
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  } else {
+    setLocation(defaultCenter);
+    setPickupCoords(defaultCenter);
+    fetchNearbyDrivers(defaultCenter);
+    toast.error("Geolocation is not supported by your browser.");
+  }
+}, [isAuthenticated]);
 
   // ─── Fetch Nearby Drivers ─────────────────────────────────────────
   const fetchNearbyDrivers = async (userLocation: { lat: number; lng: number }) => {

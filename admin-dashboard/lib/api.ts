@@ -1,6 +1,78 @@
 // admin-dashboard/lib/api.ts
+
 const API_URL = ((globalThis as any).process?.env?.NEXT_PUBLIC_API_URL) || 'https://moto-bus-backend.onrender.com/api';
+
 export const adminAPI = {
+  // ─── USERS ──────────────────────────────────────────────────────────
+  getUsers: async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/users`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.message || 'Failed to fetch users');
+    }
+    return res.json();
+  },
+
+  getUserById: async (id: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/users/${id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to fetch user');
+    return res.json();
+  },
+
+  createUser: async (data: {
+    name: string;
+    phone: string;
+    email?: string;
+    password: string;
+    role: string;
+  }) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.message || 'Failed to create user');
+    }
+    return res.json();
+  },
+
+  updateUser: async (id: string, data: any) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/users/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update user');
+    return res.json();
+  },
+
+  deleteUser: async (id: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to delete user');
+    return res.json();
+  },
+
   // ─── DRIVERS ──────────────────────────────────────────────────────
   getDrivers: async (params: {
     type?: string;
@@ -234,3 +306,5 @@ export const adminAPI = {
     return res.json();
   },
 };
+
+export default adminAPI;

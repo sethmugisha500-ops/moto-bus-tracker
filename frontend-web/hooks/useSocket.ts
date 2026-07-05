@@ -11,7 +11,8 @@ export const useSocket = (events?: Record<string, (data: any) => void>) => {
   useEffect(() => {
     if (!isAuthenticated || !token) return;
 
-    const socket = socketService.connect(token);
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL ?? window.location.origin;
+    const socket = socketService.connect(socketUrl, token);
 
     socket.on('connect', () => {
       console.log('Socket connected');

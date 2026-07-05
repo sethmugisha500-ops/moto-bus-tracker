@@ -1474,7 +1474,7 @@ if (status === (window as any).google.maps.DirectionsStatus.OK) {              r
                 position={{ lat: matchedDriver.currentLat, lng: matchedDriver.currentLng }}
                 icon={{
                   url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Ccircle cx='28' cy='28' r='26' fill='%23FF6B35' stroke='%23FFFFFF' stroke-width='3'/%3E%3Ctext x='28' y='33' text-anchor='middle' font-size='22' fill='%23000000'%3E⭐%3C/text%3E%3C/svg%3E",
-                  scaledSize: new google.maps.Size(56, 56),
+                  scaledSize: new (window as any) . google.maps.Size(56, 56),
                 }}
               />
             )}

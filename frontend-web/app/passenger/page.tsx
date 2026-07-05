@@ -584,7 +584,8 @@ useEffect(() => {
           {
             origin: new (window as any).google.maps.LatLng(location.lat, location.lng)
 ,
-            destination: new google.maps.LatLng(destinationCoords.lat, destinationCoords.lng),
+            destination: new (window as any).google.maps.LatLng(location.lat, location.lng)
+,
             travelMode: google.maps.TravelMode.DRIVING,
             provideRouteAlternatives: true,
           },

@@ -180,7 +180,7 @@ export default function DriverDashboard() {
         socket.on("ride-accepted", (data: any) => {
           if (data.driverId) {
             setRideRequests(prev => prev.filter(r => r.id !== data.rideId));
-            toast.info("Ride was accepted by another driver");
+            toast("Ride was accepted by another driver");
           }
         });
 
@@ -188,7 +188,7 @@ export default function DriverDashboard() {
           setRideRequests(prev => prev.filter(r => r.id !== data.rideId));
           if (activeRide?.id === data.rideId) {
             setActiveRide(null);
-            toast.info("Ride was cancelled by the rider");
+            toast("Ride was cancelled by the rider");
           }
         });
 

@@ -1,15 +1,14 @@
 // backend-api/src/routes/admin.ts
 import { Router, Request, Response } from 'express';
-import { authenticate, AuthRequest } from '../middleware/auth.middleware';
+import { authenticate } from '../middleware/auth.middleware';
 import { PrismaClient } from '@prisma/client';
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// ─── Helper to check admin role ──────────────────────────────────────
+// ─── Helper to check if user is admin ──────────────────────────────
 const checkAdmin = async (req: Request): Promise<boolean> => {
-  const authReq = req as AuthRequest;
-  const userId = authReq.user?.id;
+  const userId = (req as any).user?.id;
   if (!userId) return false;
   
   const user = await prisma.user.findUnique({
@@ -22,8 +21,7 @@ const checkAdmin = async (req: Request): Promise<boolean> => {
 // ─── Get Admin Stats ────────────────────────────────────────────────
 router.get('/stats', authenticate, async (req: Request, res: Response) => {
   try {
-    const authReq = req as AuthRequest;
-    const userId = authReq.user?.id;
+    const userId = (req as any).user?.id;
     
     if (!userId) {
       return res.status(401).json({
@@ -32,7 +30,6 @@ router.get('/stats', authenticate, async (req: Request, res: Response) => {
       });
     }
 
-    // Check if user is admin
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { role: true }
@@ -46,7 +43,16 @@ router.get('/stats', authenticate, async (req: Request, res: Response) => {
     }
 
     // ─── Get all stats ──────────────────────────────────────────────
-    const [totalUsers, totalDrivers, totalRides, pendingDrivers, todayRides] = await Promise.all([
+    const [
+      totalUsers,
+      totalDrivers,
+      totalRides,
+      pendingDrivers,
+      todayRides,
+      activeDrivers,
+      todayRevenue,
+      avgRating
+    ] = await Promise.all([
       prisma.user.count(),
       prisma.driver.count(),
       prisma.ride.count(),
@@ -57,26 +63,21 @@ router.get('/stats', authenticate, async (req: Request, res: Response) => {
             gte: new Date(new Date().setHours(0, 0, 0, 0))
           }
         }
+      }),
+      prisma.driver.count({ where: { isOnline: true } }),
+      prisma.ride.aggregate({
+        where: {
+          status: 'COMPLETED',
+          completedAt: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0))
+          }
+        },
+        _sum: { fare: true }
+      }),
+      prisma.driver.aggregate({
+        _avg: { rating: true }
       })
     ]);
-
-    const activeDrivers = await prisma.driver.count({
-      where: { isOnline: true }
-    });
-
-    const todayRevenue = await prisma.ride.aggregate({
-      where: {
-        status: 'COMPLETED',
-        completedAt: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0))
-        }
-      },
-      _sum: { fare: true }
-    });
-
-    const avgRating = await prisma.driver.aggregate({
-      _avg: { rating: true }
-    });
 
     const recentRides = await prisma.ride.findMany({
       take: 5,
@@ -125,8 +126,7 @@ router.get('/stats', authenticate, async (req: Request, res: Response) => {
 // ─── Get All Users ──────────────────────────────────────────────────
 router.get('/users', authenticate, async (req: Request, res: Response) => {
   try {
-    const authReq = req as AuthRequest;
-    const userId = authReq.user?.id;
+    const userId = (req as any).user?.id;
     
     if (!userId) {
       return res.status(401).json({
@@ -187,8 +187,7 @@ router.get('/users', authenticate, async (req: Request, res: Response) => {
 // ─── Get All Drivers ──────────────────────────────────────────────────
 router.get('/drivers', authenticate, async (req: Request, res: Response) => {
   try {
-    const authReq = req as AuthRequest;
-    const userId = authReq.user?.id;
+    const userId = (req as any).user?.id;
     
     if (!userId) {
       return res.status(401).json({
@@ -240,8 +239,7 @@ router.get('/drivers', authenticate, async (req: Request, res: Response) => {
 // ─── Get Pending Drivers ─────────────────────────────────────────────
 router.get('/drivers/pending', authenticate, async (req: Request, res: Response) => {
   try {
-    const authReq = req as AuthRequest;
-    const userId = authReq.user?.id;
+    const userId = (req as any).user?.id;
     
     if (!userId) {
       return res.status(401).json({
@@ -292,11 +290,10 @@ router.get('/drivers/pending', authenticate, async (req: Request, res: Response)
 });
 
 // ─── Approve Driver ──────────────────────────────────────────────────
-router.put('/drivers/:id/approve', authenticate, async (req: Request, res: Response) => {
+router.put('/drivers/:id/approve', authenticate, async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const authReq = req as AuthRequest;
-    const userId = authReq.user?.id;
+    const userId = (req as any).user?.id;
 
     if (!userId) {
       return res.status(401).json({
@@ -340,8 +337,7 @@ router.put('/drivers/:id/approve', authenticate, async (req: Request, res: Respo
 // ─── Get All Rides ──────────────────────────────────────────────────
 router.get('/rides', authenticate, async (req: Request, res: Response) => {
   try {
-    const authReq = req as AuthRequest;
-    const userId = authReq.user?.id;
+    const userId = (req as any).user?.id;
     
     if (!userId) {
       return res.status(401).json({

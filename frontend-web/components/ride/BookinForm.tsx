@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, MapPin, Navigation, DollarSign, Clock } from 'lucide-react';
 import { useTripStore } from '@/store/trip.store';
 import { useAuthStore } from '@/store/auth.store';
-import { apiClient } from '@/lib/api';
+import apiClient from '@/lib/api';
 
 interface BookingFormProps {
   onClose: () => void;

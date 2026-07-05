@@ -20,7 +20,7 @@ export default function VehiclesPage() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['vehicles', search, typeFilter],
-    queryFn: async (): Promise<any> => (await adminAPI.vehicles.getAll()).data,
+    queryFn: async (): Promise<any> => (await (adminAPI as any).vehicles.getAll()).data,
   });
 
   const vehicles = data?.vehicles || [];
@@ -28,7 +28,7 @@ export default function VehiclesPage() {
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this vehicle?')) {
       try {
-        await vehicles.delete(id);
+        await (adminAPI as any).vehicles.delete(id);
         toast.success('Vehicle deleted');
         refetch();
       } catch (error) {

@@ -2,9 +2,56 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import supportAPI from '@/lib/api';
 import { Search, Filter, RefreshCw, Send, CheckCircle, AlertCircle, Clock, User, Phone, Mail, MessageSquare, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://moto-bus-backend.onrender.com/api';
+
+const supportAPI = {
+  get: async (path: string, options?: { params?: Record<string, any> }) => {
+    const token = localStorage.getItem('token');
+    const queryParams = new URLSearchParams();
+    if (options?.params) {
+      Object.entries(options.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+    }
+    const res = await fetch(`${API_URL}${path}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('Failed to fetch support data');
+    return res.json();
+  },
+  post: async (path: string, body?: any) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error('Failed to send support request');
+    return res.json();
+  },
+  patch: async (path: string, body?: any) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}${path}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error('Failed to update support data');
+    return res.json();
+  },
+};
 
 const priorityColors = {
   high: 'bg-red-500/20 text-red-500',

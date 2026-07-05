@@ -4,6 +4,22 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../config/database';
 
 export class DriverController {
+  static getRideHistory(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
+  static getNearbyRides(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
+  static getEarnings(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
+  static updateLocation: any;
+  static toggleStatus(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
+  static getStats(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
   async updateLocation(req: AuthRequest, res: Response) {
     try {
       const { lat, lng, isOnline } = req.body;

@@ -5,6 +5,18 @@ import { PrismaClient, VehicleType } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export class RiderController {
+  static getRideHistory(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
+  static getWallet(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
+  static updateProfile(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
+  static getProfile(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
   // ============================================
   // REQUEST RIDE
   // ============================================

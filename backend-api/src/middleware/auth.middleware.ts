@@ -6,7 +6,9 @@ import { env } from '../config/env';
 import { AppError } from './errorHandler';
 
 export interface AuthRequest extends Request {
+  req: { id: string; phone: string; name: string; role: import(".prisma/client").$Enums.UserRole; };
   user?: {
+    email: string | null;
     id: string;
     phone: string;
     role: string;
@@ -35,6 +37,7 @@ export const authenticate = async (
       where: { id: decoded.userId },
       select: {
         id: true,
+        email: true,
         phone: true,
         name: true,
         role: true,

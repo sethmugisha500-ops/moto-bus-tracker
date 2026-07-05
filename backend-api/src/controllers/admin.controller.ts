@@ -4,6 +4,12 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../lib/prisma'; // ✅ Single instance
 
 export class AdminController {
+  getEarningsStats(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+    throw new Error('Method not implemented.');
+  }
+  deleteUser(arg0: AuthRequest, res: Response<any, Record<string, any>>) {
+      throw new Error('Method not implemented.');
+  }
   async getPendingDrivers(req: AuthRequest, res: Response) {
     try {
       const drivers = await prisma.driver.findMany({

@@ -1,11 +1,22 @@
 // backend-api/src/routes/rides.ts
-import { Router, Response } from 'express';
+import { Router, Response, Request, RequestHandler } from 'express';
 import { PrismaClient, RideStatus, PaymentMethod, PaymentStatus, VehicleType } from '@prisma/client';
-import { authenticate, AuthRequest } from '../middleware/auth.middleware';
+import { authenticate as authenticateMiddleware } from '../middleware/auth.middleware';
 import { z } from 'zod';
+
+type AuthRequest = Request & {
+  user?: {
+    email?: string | null;
+    id: string;
+    phone: string;
+    role: string;
+    name?: string;
+  };
+};
 
 const router = Router();
 const prisma = new PrismaClient();
+const authenticate = authenticateMiddleware as unknown as RequestHandler;
 
 // ─── Validation Schemas ──────────────────────────────────────────────
 const createRideSchema = z.object({

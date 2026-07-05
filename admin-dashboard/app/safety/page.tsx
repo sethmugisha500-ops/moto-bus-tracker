@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminAPI as safetyAPI } from '@/lib/api';
+import { adminAPI as safetyAPI } from '../../lib/api';
 import { Search, Filter, RefreshCw, AlertTriangle, MapPin, User, Phone, Clock, CheckCircle, XCircle, Eye, Send, Navigation } from 'lucide-react';
 import toast from 'react-hot-toast';
 

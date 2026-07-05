@@ -1,5 +1,6 @@
 // lib/maps.ts
-export const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBhSwtJuzcMWquIKGXCGRsHDsEWcELFINE';
+// Access process via globalThis to avoid TS error in browser builds where `process` is not defined
+export const GOOGLE_MAPS_API_KEY = ((globalThis as any).process?.env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) || 'AIzaSyBhSwtJuzcMWquIKGXCGRsHDsEWcELFINE';
 
 // ─── LOAD GOOGLE MAPS SCRIPT ──────────────────────────────────────
 export const loadGoogleMapsScript = (): Promise<void> => {

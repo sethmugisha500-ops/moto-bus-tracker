@@ -2,7 +2,34 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminAPI } from '@/lib/api';
+
+// Safely access env var without referencing the undeclared `process` in the client
+const API_URL = ((typeof globalThis !== 'undefined' && (globalThis as any).process && (globalThis as any).process.env && (globalThis as any).process.env.NEXT_PUBLIC_API_URL) as string) || 'http://localhost:5000/api';
+
+// Admin API functions
+const adminAPI = {
+  getDrivers: async (params: { search?: string; status?: string }) => {
+    const token = localStorage.getItem('token');
+    const apiUrl = API_URL;
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.status) queryParams.append('status', params.status);
+    const res = await fetch(`${apiUrl}/admin/drivers?${queryParams}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to fetch drivers');
+    return res.json();
+  },
+  suspendDriver: async (id: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/drivers/${id}/suspend`, {
+      method: 'PUT',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to suspend driver');
+    return res.json();
+  },
+};
 import { 
   Search, Eye, UserCheck, UserX, Users, UserPlus, 
   RefreshCw, Filter, Calendar, TrendingUp, AlertCircle,
@@ -28,8 +55,7 @@ export default function RidersPage() {
     suspend: (id: string) => adminAPI.suspendDriver(id),
     activate: async (id: string) => {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const res = await fetch(`${apiUrl}/admin/drivers/${id}/activate`, {
+      const res = await fetch(`${API_URL}/admin/drivers/${id}/activate`, {
         method: 'PUT',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

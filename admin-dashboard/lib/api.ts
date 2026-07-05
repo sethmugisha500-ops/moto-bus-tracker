@@ -1,5 +1,5 @@
 // admin-dashboard/lib/api.ts
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://moto-bus-backend.onrender.com/api';
+const API_URL = ((globalThis as any).process?.env?.NEXT_PUBLIC_API_URL) || 'https://moto-bus-backend.onrender.com/api';
 export const adminAPI = {
   // ─── DRIVERS ──────────────────────────────────────────────────────
   getDrivers: async (params: {

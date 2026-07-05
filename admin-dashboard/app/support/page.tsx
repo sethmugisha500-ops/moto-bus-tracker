@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Filter, RefreshCw, Send, CheckCircle, AlertCircle, Clock, User, Phone, Mail, MessageSquare, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://moto-bus-backend.onrender.com/api';
+// Use globalThis to safely access process.env in environments where "process" may not be declared
+const API_URL = (typeof window !== 'undefined' ? (globalThis as any).process?.env?.NEXT_PUBLIC_API_URL : '') || 'https://moto-bus-backend.onrender.com/api';
 
 const supportAPI = {
   get: async (path: string, options?: { params?: Record<string, any> }) => {

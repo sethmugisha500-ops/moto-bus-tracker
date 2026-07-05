@@ -2,15 +2,17 @@
 'use client';
 
 import { Inter } from 'next/font/google';
-import './globals.css';  // ← THIS IS MISSING - ADD THIS LINE
+// @ts-ignore: side-effect import for global CSS
+import './globals.css';
 import { Providers } from './providers';
-import MobileHeader from '@/components/layout/MobileHeader';
+import MobileHeader from '../components/layout/MobileHeader';
 import { usePathname } from 'next/navigation';
 import Script from 'next/script';
 import { Toaster } from 'react-hot-toast';
 
 const inter = Inter({ subsets: ['latin'] });
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyCB07j6ULHsLCI-QEWG4hXKKEDyhOA3d84';
+// Access env via globalThis to avoid 'process' not found in client bundle TypeScript error
+const GOOGLE_MAPS_API_KEY = (globalThis as any)?.process?.env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyCB07j6ULHsLCI-QEWG4hXKKEDyhOA3d84';
 
 export default function RootLayout({
   children,

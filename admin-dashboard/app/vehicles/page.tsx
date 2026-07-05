@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { adminAPI } from '@/lib/api';
 import { Search, Plus, Edit, Trash2, Car, Bike, Bus, Truck, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { adminAPI } from '../../lib/api';
 
 const vehicleIcons = {
   MOTO: '🏍️',

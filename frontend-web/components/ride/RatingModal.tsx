@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star, X } from 'lucide-react';
-import { apiClient } from '@/lib/api';
+import apiClient from '@/lib/api';
 
 interface RatingModalProps {
   rideId: string;

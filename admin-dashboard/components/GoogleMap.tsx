@@ -2,8 +2,36 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { GOOGLE_MAPS_API_KEY, loadGoogleMapsScript } from '@/lib/maps';
 
+// Inline loader for Google Maps script to avoid external dependency
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBhSwtJuzcMWquIKGXCGRsHDsEWcELFINE';
+let __googleMapsLoader: Promise<void> | null = null;
+function loadGoogleMapsScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.reject(new Error('Window is undefined'));
+  if ((window as any).google && (window as any).google.maps) return Promise.resolve();
+  if (__googleMapsLoader) return __googleMapsLoader;
+
+  __googleMapsLoader = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-google-maps]`);
+    if (existing) {
+      // if script tag exists, wait for load or error
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Failed to load Google Maps script')));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
+    script.async = true;
+    script.defer = true;
+    script.setAttribute('data-google-maps', 'true');
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Maps script'));
+    document.head.appendChild(script);
+  });
+
+  return __googleMapsLoader;
+}
 interface MapProps {
   center?: { lat: number; lng: number };
   zoom?: number;

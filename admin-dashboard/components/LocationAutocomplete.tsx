@@ -2,7 +2,35 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { GOOGLE_MAPS_API_KEY, loadGoogleMapsScript } from '@/lib/maps';
+
+// Lightweight local replacement for '@/lib/maps' to avoid missing-module errors.
+// Expects NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to be provided in environment for client build.
+const GOOGLE_MAPS_API_KEY = (process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '') as string;
+
+const loadGoogleMapsScript = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') return reject(new Error('Window is undefined'));
+    if ((window as any).google && (window as any).google.maps) return resolve();
+
+    const existing = document.querySelector(`script[data-google-maps]`);
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Failed to load Google Maps script')));
+      return;
+    }
+
+    if (!GOOGLE_MAPS_API_KEY) return reject(new Error('Missing Google Maps API key'));
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.setAttribute('data-google-maps', '1');
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Maps script'));
+    document.head.appendChild(script);
+  });
+};
 
 interface LocationAutocompleteProps {
   value: string;

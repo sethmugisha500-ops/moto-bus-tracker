@@ -81,7 +81,7 @@ export default function AdminMap({
           label={driver.name}
           icon={{
             url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2300C26F' stroke='%23FFFFFF' stroke-width='2'/%3E%3Ctext x='16' y='20' text-anchor='middle' font-size='14' fill='%23000000'%3E🚗%3C/text%3E%3C/svg%3E",
-            scaledSize: new google.maps.Size(32, 32),
+            scaledSize: new  google.maps.Size(32, 32),
           }}
         />
       ))}

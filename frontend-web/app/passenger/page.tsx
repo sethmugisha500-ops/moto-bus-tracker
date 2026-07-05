@@ -1436,7 +1436,7 @@ if (status === (window as any).google.maps.DirectionsStatus.OK) {              r
               <Marker
                 position={destinationCoords}
                 icon={{
-                  path: google.maps.SymbolPath.CIRCLE,
+                  path: (window as any).google.maps.SymbolPath.CIRCLE,
                   scale: 12,
                   fillColor: "#FF6B35",
                   fillOpacity: 1,

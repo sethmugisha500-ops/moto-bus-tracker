@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import safetyAPI from '@/lib/api';
+import { adminAPI as safetyAPI } from '@/lib/api';
 import { Search, Filter, RefreshCw, AlertTriangle, MapPin, User, Phone, Clock, CheckCircle, XCircle, Eye, Send, Navigation } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -39,7 +39,7 @@ export default function SafetyPage() {
   const { data: alertsData, isLoading: alertsLoading, refetch: refetchAlerts } = useQuery({
     queryKey: ['sos-alerts', search],
     queryFn: () =>
-      safetyAPI
+      (safetyAPI as any)
         .get('/sos-alerts', { params: { search } })
         .then((res: { data: any }) => res.data),
     refetchInterval: 10000,
@@ -49,7 +49,7 @@ export default function SafetyPage() {
   const { data: disputesData, isLoading: disputesLoading, refetch: refetchDisputes } = useQuery({
     queryKey: ['disputes', search],
     queryFn: () =>
-      safetyAPI
+      (safetyAPI as any)
         .get('/disputes', { params: { search } })
         .then((res: { data: any }) => res.data),
     refetchInterval: 30000,
@@ -58,14 +58,14 @@ export default function SafetyPage() {
   // Fetch Accidents
   const { data: accidentsData, isLoading: accidentsLoading } = useQuery({
     queryKey: ['accidents'],
-    queryFn: () => safetyAPI.get('/accidents').then((res: { data: any }) => res.data),
+    queryFn: () => (safetyAPI as any).get('/accidents').then((res: { data: any }) => res.data),
     enabled: activeTab === 'accidents',
   });
 
   // Resolve Alert mutation
   const resolveAlertMutation = useMutation({
     mutationFn: ({ id, note }: { id: string; note: string }) =>
-      safetyAPI.post(`/sos-alerts/${id}/resolve`, { note }),
+      (safetyAPI as any).post(`/sos-alerts/${id}/resolve`, { note }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sos-alerts'] });
       toast.success('Alert resolved');
@@ -80,7 +80,7 @@ export default function SafetyPage() {
   // Resolve Dispute mutation
   const resolveDisputeMutation = useMutation({
     mutationFn: ({ id, decision }: { id: string; decision: string }) =>
-      safetyAPI.post(`/disputes/${id}/resolve`, { decision, note: resolutionNote }),
+      (safetyAPI as any).post(`/disputes/${id}/resolve`, { decision, note: resolutionNote }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['disputes'] });
       toast.success('Dispute resolved');

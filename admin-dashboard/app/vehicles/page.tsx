@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { vehiclesAPI } from '@/lib/api';
+import { adminAPI } from '@/lib/api';
 import { Search, Plus, Edit, Trash2, Car, Bike, Bus, Truck, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -20,7 +20,7 @@ export default function VehiclesPage() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['vehicles', search, typeFilter],
-    queryFn: () => vehiclesAPI.getAll().then(res => res.data),
+    queryFn: async (): Promise<any> => (await adminAPI.vehicles.getAll()).data,
   });
 
   const vehicles = data?.vehicles || [];
@@ -28,7 +28,7 @@ export default function VehiclesPage() {
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this vehicle?')) {
       try {
-        await vehiclesAPI.delete(id);
+        await vehicles.delete(id);
         toast.success('Vehicle deleted');
         refetch();
       } catch (error) {

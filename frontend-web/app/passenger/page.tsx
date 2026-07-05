@@ -576,13 +576,14 @@ useEffect(() => {
 
   // ── Calculate Route ──────────────────────────────────────────────
   const calculateRoute = useCallback(async () => {
-    if (!pickupCoords || !destinationCoords || !directionsService.current) return;
+    if (!pickupCoords || !destinationCoords || !directionsService.current || !location) return;
 
     try {
       const result = await new Promise((resolve, reject) => {
         directionsService.current.route(
           {
-            origin: new google.maps.LatLng(pickupCoords.lat, pickupCoords.lng),
+            origin: new (window as any).google.maps.LatLng(location.lat, location.lng)
+,
             destination: new google.maps.LatLng(destinationCoords.lat, destinationCoords.lng),
             travelMode: google.maps.TravelMode.DRIVING,
             provideRouteAlternatives: true,

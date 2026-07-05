@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Phone, MessageCircle, Navigation, AlertTriangle, Star, X } from 'lucide-react';
 import { useTripStore } from '@/store/trip.store';
 import { socketService } from '@/lib/socket';
-import { apiClient } from '@/lib/api';
+import apiClient from '@/lib/api';
 
 interface ActiveRideProps {
   onClose: () => void;

@@ -30,12 +30,12 @@ export default function WalletHistoryPage() {
       if (filter !== "all") filterParams.status = filter;
       if (searchTerm) filterParams.search = searchTerm;
       
-      const result = await fetchTransactions(filterParams);
-      setTotal(result.total || 0);
+      await fetchTransactions(filterParams);
+      setTotal(transactions.length || 0);
     } catch (error) {
       console.error("Failed to load transactions:", error);
     }
-  }, [filter, limit, offset, searchTerm, fetchTransactions]);
+  }, [filter, limit, offset, searchTerm, fetchTransactions, transactions.length]);
 
   useEffect(() => {
     loadTransactions();

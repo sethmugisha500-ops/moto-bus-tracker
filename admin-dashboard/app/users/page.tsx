@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ridersAPI } from '@/lib/api';
+import { adminAPI } from '@/lib/api';
 import { 
   Search, Eye, UserCheck, UserX, Users, UserPlus, 
   RefreshCw, Filter, Calendar, TrendingUp, AlertCircle,
@@ -18,6 +18,25 @@ export default function RidersPage() {
   const [sortBy, setSortBy] = useState('newest');
   const [selectedRider, setSelectedRider] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  const ridersAPI = {
+    getAll: (params: { search?: string; status?: string; sort?: string }) =>
+      adminAPI.getDrivers({
+        search: params.search,
+        status: params.status,
+      }),
+    suspend: (id: string) => adminAPI.suspendDriver(id),
+    activate: async (id: string) => {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${apiUrl}/admin/drivers/${id}/activate`, {
+        method: 'PUT',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('Failed to activate rider');
+      return res.json();
+    },
+  };
 
   // Fetch riders
   const { data, isLoading, refetch, isFetching } = useQuery({

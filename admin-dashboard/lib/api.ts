@@ -1,104 +1,237 @@
-import axios from 'axios';
-
+// admin-dashboard/lib/api.ts
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-export const api = axios.create({
-  baseURL: API_URL,
-  headers: { 'Content-Type': 'application/json' },
-});
+export const adminAPI = {
+  // ─── DRIVERS ──────────────────────────────────────────────────────
+  getDrivers: async (params: {
+    type?: string;
+    search?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const token = localStorage.getItem('token');
+    const queryParams = new URLSearchParams();
+    if (params.type) queryParams.append('type', params.type);
+    if (params.search) queryParams.append('search', params.search);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.page) queryParams.append('page', String(params.page));
+    if (params.limit) queryParams.append('limit', String(params.limit));
 
-// Request interceptor
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('adminToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+    const res = await fetch(`${API_URL}/admin/drivers?${queryParams.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('Failed to fetch drivers');
+    return res.json();
+  },
 
-// Response interceptor
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('adminToken');
-      localStorage.removeItem('adminUser');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+  getPendingDrivers: async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/drivers/pending`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('Failed to fetch pending drivers');
+    return res.json();
+  },
 
-// Auth API
-export const authAPI = {
-  login: (email: string, password: string) => api.post('/auth/admin/login', { email, password }),
-  sendOTP: (phone: string) => api.post('/auth/send-otp', { phone }),
-  verifyOTP: (phone: string, otp: string) => api.post('/auth/verify-otp', { phone, otp }),
-  getMe: () => api.get('/auth/me'),
+  approveDriver: async (driverId: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/drivers/${driverId}/approve`, {
+      method: 'PUT',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to approve driver');
+    return res.json();
+  },
+
+  rejectDriver: async (driverId: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/drivers/${driverId}/reject`, {
+      method: 'PUT',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to reject driver');
+    return res.json();
+  },
+
+  suspendDriver: async (driverId: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/drivers/${driverId}/suspend`, {
+      method: 'PUT',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to suspend driver');
+    return res.json();
+  },
+
+  toggleOnlineStatus: async (driverId: string, isOnline: boolean) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/drivers/${driverId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ isOnline }),
+    });
+    if (!res.ok) throw new Error('Failed to update status');
+    return res.json();
+  },
+
+  getDriverDetails: async (driverId: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/drivers/${driverId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to fetch driver details');
+    return res.json();
+  },
+
+  // ─── STATS ──────────────────────────────────────────────────────
+  getStats: async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/stats`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('Failed to fetch stats');
+    return res.json();
+  },
+
+  // ─── NOTIFICATIONS ─────────────────────────────────────────────
+  sendNotification: async (data: {
+    title: string;
+    message: string;
+    type: string;
+    audience: string;
+    scheduledAt?: string;
+  }) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/notifications/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to send notification');
+    return res.json();
+  },
+
+  getNotifications: async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/notifications`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('Failed to fetch notifications');
+    return res.json();
+  },
+
+  deleteNotification: async (id: string) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/notifications/${id}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to delete notification');
+    return res.json();
+  },
+
+  // ─── REPORTS ────────────────────────────────────────────────────
+  getReports: async (params: {
+    period: string;
+    vehicleType: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const token = localStorage.getItem('token');
+    const queryParams = new URLSearchParams();
+    queryParams.append('period', params.period);
+    if (params.vehicleType !== 'all') queryParams.append('vehicleType', params.vehicleType);
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+
+    const res = await fetch(`${API_URL}/admin/reports?${queryParams.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('Failed to fetch reports');
+    return res.json();
+  },
+
+  exportReport: async (params: {
+    type: string;
+    period: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const token = localStorage.getItem('token');
+    const queryParams = new URLSearchParams();
+    queryParams.append('type', params.type);
+    queryParams.append('period', params.period);
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+
+    const res = await fetch(`${API_URL}/admin/reports/export?${queryParams.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to export report');
+    return res.blob();
+  },
+
+  // ─── PAYMENTS ────────────────────────────────────────────────────
+  getPayments: async (params: {
+    search?: string;
+    status?: string;
+    method?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const token = localStorage.getItem('token');
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.method) queryParams.append('method', params.method);
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+    if (params.page) queryParams.append('page', String(params.page));
+    if (params.limit) queryParams.append('limit', String(params.limit));
+
+    const res = await fetch(`${API_URL}/admin/payments?${queryParams.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('Failed to fetch payments');
+    return res.json();
+  },
+
+  getPaymentStats: async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/payments/stats`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error('Failed to fetch payment stats');
+    return res.json();
+  },
+
+  processPayout: async (data: { driverId: string; amount: number; method: string }) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${API_URL}/admin/payouts/process`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to process payout');
+    return res.json();
+  },
 };
-
-// Dashboard API
-export const dashboardAPI = {
-  getStats: () => api.get('/admin/stats'),
-  getCharts: () => api.get('/admin/charts'),
-  getRecentActivity: () => api.get('/admin/recent'),
-};
-
-// Drivers API
-export const driversAPI = {
-  getAll: (params?: any) => api.get('/admin/drivers', { params }),
-  getById: (id: string) => api.get(`/admin/drivers/${id}`),
-  approve: (id: string) => api.put(`/admin/drivers/${id}/approve`),
-  suspend: (id: string) => api.put(`/admin/drivers/${id}/suspend`),
-  getEarnings: (id: string) => api.get(`/admin/drivers/${id}/earnings`),
-};
-
-
-// Riders API
-export const ridersAPI = {
-  getAll: (p0: { search: string; status: string | undefined; sort: string; }) => api.get('/admin/riders'),
-  getById: (id: string) => api.get(`/admin/riders/${id}`),
-  suspend: (id: string) => api.put(`/admin/riders/${id}/suspend`),
-  activate: (id: string) => api.put(`/admin/riders/${id}/activate`),
-};
-
-// Vehicles API
-export const vehiclesAPI = {
-  getAll: () => api.get('/admin/vehicles'),
-  getById: (id: string) => api.get(`/admin/vehicles/${id}`),
-  create: (data: any) => api.post('/admin/vehicles', data),
-  update: (id: string, data: any) => api.put(`/admin/vehicles/${id}`, data),
-  delete: (id: string) => api.delete(`/admin/vehicles/${id}`),
-};
-
-// Payments API
-export const paymentsAPI = {
-  getAll: (params?: any) => api.get('/admin/payments', { params }),
-  getStats: () => api.get('/admin/payments/stats'),
-  getPayoutRequests: () => api.get('/admin/payouts/requests'),
-  processPayout: (driverId: string, amount: number, method: string) => 
-    api.post('/admin/payouts/process', { driverId, amount, method }),
-  getReceipt: (paymentId: string) => api.get(`/admin/payments/${paymentId}/receipt`, { responseType: 'blob' }),
-};
-// Notifications API
-export const notificationsAPI = {
-  getAll: () => api.get('/admin/notifications'),
-  send: (data: any) => api.post('/admin/notifications/send', data),
-  markAsRead: (id: string) => api.put(`/admin/notifications/${id}/read`),
-};
-
-// Reports API
-export const reportsAPI = {
-  getRevenue: (start: string, end: string) => api.get('/admin/reports/revenue', { params: { start, end } }),
-  getDrivers: (start: string, end: string) => api.get('/admin/reports/drivers', { params: { start, end } }),
-  exportCSV: (type: string, start: string, end: string) => api.get(`/admin/reports/export/${type}`, { params: { start, end }, responseType: 'blob' }),
-};
-
-// Settings API
-export const settingsAPI = {
-  get: () => api.get('/admin/settings'),
-  update: (data: any) => api.put('/admin/settings', data),
-  updatePricing: (data: any) => api.put('/admin/settings/pricing', data),
-};
-
-export default api;

@@ -1462,7 +1462,7 @@ if (status === (window as any).google.maps.DirectionsStatus.OK) {              r
                       : driver.vehicleType === "CAR"
                       ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='16' fill='%238184F8' stroke='%23FFFFFF' stroke-width='2'/%3E%3Ctext x='18' y='22' text-anchor='middle' font-size='16' fill='%23000000'%3E🚗%3C/text%3E%3C/svg%3E"
                       : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='16' fill='%2300C26F' stroke='%23FFFFFF' stroke-width='2'/%3E%3Ctext x='18' y='22' text-anchor='middle' font-size='16' fill='%23000000'%3E🏍️%3C/text%3E%3C/svg%3E",
-                    scaledSize: new google.maps.Size(36, 36),
+                    scaledSize: new (window as any). google.maps.Size(36, 36),
                   }}
                 />
               )

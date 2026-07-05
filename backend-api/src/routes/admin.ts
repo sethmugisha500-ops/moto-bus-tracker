@@ -6,10 +6,25 @@ import { PrismaClient } from '@prisma/client';
 const router = Router();
 const prisma = new PrismaClient();
 
+// ─── Helper to check admin role ──────────────────────────────────────
+const checkAdmin = async (req: Request): Promise<boolean> => {
+  const authReq = req as AuthRequest;
+  const userId = authReq.user?.id;
+  if (!userId) return false;
+  
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true }
+  });
+  return user?.role === 'ADMIN';
+};
+
 // ─── Get Admin Stats ────────────────────────────────────────────────
-router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/stats', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?.id;
+    
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -45,12 +60,10 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       })
     ]);
 
-    // ─── Get active drivers ──────────────────────────────────────────
     const activeDrivers = await prisma.driver.count({
       where: { isOnline: true }
     });
 
-    // ─── Get today's revenue ──────────────────────────────────────────
     const todayRevenue = await prisma.ride.aggregate({
       where: {
         status: 'COMPLETED',
@@ -61,12 +74,10 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       _sum: { fare: true }
     });
 
-    // ─── Get average rating ──────────────────────────────────────────
     const avgRating = await prisma.driver.aggregate({
       _avg: { rating: true }
     });
 
-    // ─── Get recent rides ─────────────────────────────────────────────
     const recentRides = await prisma.ride.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
@@ -76,7 +87,6 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       }
     });
 
-    // ─── Get vehicle types breakdown ──────────────────────────────────
     const vehicleTypes = await prisma.driver.groupBy({
       by: ['vehicleType'],
       _count: true
@@ -113,9 +123,11 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // ─── Get All Users ──────────────────────────────────────────────────
-router.get('/users', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/users', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?.id;
+    
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -173,9 +185,11 @@ router.get('/users', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // ─── Get All Drivers ──────────────────────────────────────────────────
-router.get('/drivers', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/drivers', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?.id;
+    
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -224,9 +238,11 @@ router.get('/drivers', authenticate, async (req: AuthRequest, res: Response) => 
 });
 
 // ─── Get Pending Drivers ─────────────────────────────────────────────
-router.get('/drivers/pending', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/drivers/pending', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?.id;
+    
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -276,10 +292,11 @@ router.get('/drivers/pending', authenticate, async (req: AuthRequest, res: Respo
 });
 
 // ─── Approve Driver ──────────────────────────────────────────────────
-router.put('/drivers/:id/approve', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/drivers/:id/approve', authenticate, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?.id;
 
     if (!userId) {
       return res.status(401).json({
@@ -321,9 +338,11 @@ router.put('/drivers/:id/approve', authenticate, async (req: AuthRequest, res: R
 });
 
 // ─── Get All Rides ──────────────────────────────────────────────────
-router.get('/rides', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/rides', authenticate, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?.id;
+    
     if (!userId) {
       return res.status(401).json({
         success: false,

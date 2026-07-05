@@ -124,7 +124,7 @@ export default function LoginPage() {
       await new Promise(resolve => setTimeout(resolve, 200));
 
       if (role === "ADMIN") {
-        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_DASHBOARD_URL || 'http://localhost:3001';
+        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_DASHBOARD_URL || 'https://moto-bus-admin.onrender.com';
         window.location.href = `${adminUrl}/dashboard`;
       } else if (role === "DRIVER") {
         router.push("/driver/dashboard");

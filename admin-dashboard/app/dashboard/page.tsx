@@ -1,312 +1,568 @@
-// admin-dashboard/app/dashboard/page.tsx
+// app/driver/dashboard/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
-  Users, Users2, Bike, Bus, Truck, TrendingUp, 
-  DollarSign, Eye, CheckCircle, XCircle, Clock, 
-  Search, AlertCircle, RefreshCw, UserCheck, UserX,
-  Calendar, ArrowUpRight, ArrowDownRight, 
-  Sparkles, Shield, Star, Wallet, MapPin,
-  Bell, Menu, Plus, Filter, Activity,
-  BarChart3, PieChart, ChevronRight, Home,
-  Settings, LogOut, HelpCircle, Award,
-  Zap, Target, Crown, Flame, Gift,
-  UserPlus, MessageSquare, Phone, Mail,
-  Globe, Linkedin, Twitter, Instagram,
-  AlertTriangle
+  Bike, Navigation, Clock, AlertCircle, 
+  RefreshCw, Loader2, Phone, User, MapPin,
+  DollarSign, Star, Wifi, WifiOff, 
+  ChevronRight, Settings, History, Wallet,
+  Award, Target, Zap, Shield, CheckCircle,
+  XCircle, HelpCircle, Menu, LogOut,
+  Users
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || API_URL.replace(/\/api\/?$/, "");
 
-
-// ─── TYPES ──────────────────────────────────────────────────────────
-interface Driver {
+interface RideRequest {
   id: string;
-  userId: string;
-  name: string;
-  phone: string;
-  email: string;
-  licenseNumber: string;
-  vehicleType: string;
-  vehicleNumber: string;
-  vehicleModel: string;
-  isApproved: boolean;
-  isOnline: boolean;
+  riderName?: string;
+  riderPhone?: string;
+  pickupAddress: string;
+  dropoffAddress: string;
+  fare: number;
+  distance: string;
+  status?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  dropoffLat?: number;
+  dropoffLng?: number;
+  createdAt?: string;
+}
+
+interface Earnings {
+  today: {
+    amount: number;
+    trips: number;
+  };
+  week: {
+    amount: number;
+    trips: number;
+  };
+  month?: {
+    amount: number;
+    trips: number;
+  };
+}
+
+interface DriverStats {
   rating: number;
+  isOnline: boolean;
+  isApproved: boolean;
   totalTrips: number;
   totalEarnings: number;
-  joinedAt: string;
-  isActive: boolean;
-}
-
-interface Stats {
-  totalUsers: number;
-  totalDrivers: number;
-  totalRiders: number;
-  totalRides: number;
-  totalRevenue: number;
-  motoCount: number;
-  busCount: number;
-  minibusCount: number;
-  pendingDrivers: number;
-  activeDrivers: number;
-  completedRides: number;
   todayRides: number;
-  sosAlerts: number;
-  completionRate: number;
+  vehicle: {
+    type: string;
+    number: string;
+    model: string;
+  };
+  name: string;
+  phone: string;
 }
 
-interface RecentActivity {
-  id: string;
-  type: 'ride' | 'driver' | 'payment' | 'user' | 'alert';
-  description: string;
-  amount?: number;
-  status: string;
-  timestamp: string;
-  user?: string;
-  icon?: string;
-}
-
-// ─── API FUNCTIONS ──────────────────────────────────────────────────
-const api = {
-  getStats: async (): Promise<{ stats: Stats }> => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/admin/stats`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      const error = await res.text();
-      throw new Error(`Failed to fetch stats: ${error}`);
-    }
-    return res.json();
-  },
-
-  getDrivers: async (params?: any): Promise<{ data: Driver[] }> => {
-    const token = localStorage.getItem('token');
-    const queryParams = new URLSearchParams(params);
-    const res = await fetch(`${API_URL}/admin/drivers?${queryParams.toString()}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      const error = await res.text();
-      throw new Error(`Failed to fetch drivers: ${error}`);
-    }
-    return res.json();
-  },
-
-  getRecentActivity: async (): Promise<{ activities: RecentActivity[] }> => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${API_URL}/admin/activity/recent`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      // If endpoint doesn't exist, return empty array
-      return { activities: [] };
-    }
-    return res.json();
-  },
-};
-
-// ─── STAT CARD ──────────────────────────────────────────────────────
-const StatCard = ({ 
-  icon: Icon, 
-  label, 
-  value, 
-  change, 
-  color, 
-  subtitle, 
-  onClick,
-  loading 
-}: any) => (
-  <div 
-    onClick={onClick}
-    className="bg-[#111714] border border-gray-800 rounded-xl p-5 hover:border-green-500/30 transition-all cursor-pointer group relative overflow-hidden"
-  >
-    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500/5 to-transparent rounded-full blur-2xl" />
-    
-    <div className="relative z-10">
-      <div className="flex items-center justify-between mb-3">
-        <div className={`p-2.5 rounded-xl bg-${color}-500/10 group-hover:bg-${color}-500/20 transition`}>
-          <Icon className={`text-${color}-500`} size={20} />
-        </div>
-        {change !== undefined && (
-          <span className={`text-xs font-medium flex items-center gap-1 px-2 py-1 rounded-full ${
-            change >= 0 
-              ? 'text-green-500 bg-green-500/10' 
-              : 'text-red-500 bg-red-500/10'
-          }`}>
-            {change >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-            {change >= 0 ? '+' : ''}{change}%
-          </span>
-        )}
-      </div>
-      {loading ? (
-        <div className="h-8 w-20 bg-gray-700/30 rounded animate-pulse" />
-      ) : (
-        <p className="text-3xl font-bold text-white">{value?.toLocaleString() || 0}</p>
-      )}
-      <p className="text-sm text-gray-400 mt-1">{label}</p>
-      {subtitle && <p className="text-[10px] text-gray-500 mt-0.5">{subtitle}</p>}
-    </div>
-  </div>
-);
-
-// ─── ACTIVITY ITEM ──────────────────────────────────────────────────
-const ActivityItem = ({ activity }: { activity: RecentActivity }) => {
-  const getIcon = () => {
-    switch (activity.type) {
-      case 'ride': return <Truck size={14} className="text-blue-500" />;
-      case 'driver': return <Users2 size={14} className="text-green-500" />;
-      case 'payment': return <DollarSign size={14} className="text-yellow-500" />;
-      case 'user': return <UserPlus size={14} className="text-purple-500" />;
-      case 'alert': return <AlertTriangle size={14} className="text-red-500" />;
-      default: return <Clock size={14} className="text-gray-400" />;
-    }
-  };
-
-  const getStatusColor = () => {
-    switch (activity.status) {
-      case 'completed':
-      case 'approved':
-        return 'bg-green-500/20 text-green-500 border-green-500/20';
-      case 'pending':
-        return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20';
-      case 'failed':
-      case 'rejected':
-        return 'bg-red-500/20 text-red-500 border-red-500/20';
-      case 'active':
-        return 'bg-red-500/20 text-red-500 border-red-500/20';
-      default:
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/20';
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-3 p-3 bg-[#0A0E0B] rounded-xl hover:bg-[#111714] transition border border-transparent hover:border-gray-800">
-      <div className="w-9 h-9 bg-[#111714] rounded-lg flex items-center justify-center flex-shrink-0">
-        {getIcon()}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white truncate">{activity.description}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${getStatusColor()}`}>
-            {activity.status}
-          </span>
-          <span className="text-[10px] text-gray-500">
-            {new Date(activity.timestamp).toLocaleTimeString()}
-          </span>
-        </div>
-      </div>
-      {activity.amount && (
-        <span className="text-sm font-bold text-green-500">
-          RWF {activity.amount.toLocaleString()}
-        </span>
-      )}
-    </div>
-  );
-};
-
-// ─── MAIN COMPONENT ──────────────────────────────────────────────
-export default function DashboardPage() {
+// ── Main Component ──────────────────────────────────────────────────
+export default function DriverDashboard() {
   const router = useRouter();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [activities, setActivities] = useState<RecentActivity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(false);
+  const [isApproved, setIsApproved] = useState(false);
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [rideRequests, setRideRequests] = useState<RideRequest[]>([]);
+  const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-  const [userName, setUserName] = useState('Admin');
-  const [currentTime, setCurrentTime] = useState('');
+  const [error, setError] = useState("");
+  const [earnings, setEarnings] = useState<Earnings>({
+    today: { amount: 0, trips: 0 },
+    week: { amount: 0, trips: 0 },
+    month: { amount: 0, trips: 0 }
+  });
+  const [totalTrips, setTotalTrips] = useState(0);
+  const [rating, setRating] = useState(4.8);
+  const [driverName, setDriverName] = useState("Driver");
+  const [driverPhone, setDriverPhone] = useState("");
+  const [vehicleInfo, setVehicleInfo] = useState({
+    number: "MT-001A",
+    model: "Yamaha FZ-S",
+    type: "MOTO",
+  });
+  const [acceptedRideId, setAcceptedRideId] = useState<string | null>(null);
+  const [rideStatus, setRideStatus] = useState<string>("");
 
-  // ─── Get user and time ──────────────────────────────────────────
+  const socketRef = useRef<any>(null);
+  const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ── Get Driver Info ────────────────────────────────────────────────
   useEffect(() => {
-    const userData = localStorage.getItem('user');
+    const token = localStorage.getItem("token");
+    const userData = localStorage.getItem("user");
+    
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
     if (userData) {
       try {
         const user = JSON.parse(userData);
-        setUserName(user.name || 'Admin');
+        if (user.role !== "DRIVER") {
+          router.push("/passenger");
+          return;
+        }
+        setDriverName(user.name || "Driver");
+        setDriverPhone(user.phone || "");
       } catch {
-        setUserName('Admin');
+        router.push("/login");
       }
     }
 
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true 
-      }));
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchDriverData();
+    setupLocationTracking();
+    setupSocketConnection();
 
-  // ─── Fetch Data ──────────────────────────────────────────────────
-  const fetchData = async () => {
+    return () => {
+      if (locationIntervalRef.current) {
+        clearInterval(locationIntervalRef.current);
+      }
+      if (fetchIntervalRef.current) {
+        clearInterval(fetchIntervalRef.current);
+      }
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, [router]);
+
+  // ── Setup Socket Connection ───────────────────────────────────────
+  const setupSocketConnection = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      import('socket.io-client').then(({ io }) => {
+        const socket = io(SOCKET_URL, {
+          transports: ["websocket", "polling"],
+          auth: { token },
+        });
+        socketRef.current = socket;
+
+        socket.on("connect", () => {
+          console.log("Driver socket connected:", socket.id);
+        });
+
+        socket.on("new-ride-request", (data: any) => {
+          if (isOnline && isApproved) {
+            const newRide: RideRequest = {
+              id: data.id,
+              riderName: data.rider?.name || "Rider",
+              riderPhone: data.rider?.phone || "",
+              pickupAddress: data.pickupAddress || "Unknown location",
+              dropoffAddress: data.dropoffAddress || "Unknown destination",
+              fare: data.fare || 0,
+              distance: data.distance ? `${data.distance.toFixed(1)} km` : "0 km",
+              status: data.status,
+              pickupLat: data.pickupLat,
+              pickupLng: data.pickupLng,
+              dropoffLat: data.dropoffLat,
+              dropoffLng: data.dropoffLng,
+              createdAt: data.createdAt,
+            };
+            setRideRequests(prev => [newRide, ...prev]);
+            toast.success(`🔔 New ride request from ${newRide.riderName}`);
+          }
+        });
+
+        socket.on("ride-accepted", (data: any) => {
+          if (data.driverId) {
+            setRideRequests(prev => prev.filter(r => r.id !== data.rideId));
+            toast("Ride was accepted by another driver");
+          }
+        });
+
+        socket.on("ride-cancelled", (data: any) => {
+          setRideRequests(prev => prev.filter(r => r.id !== data.rideId));
+          if (activeRide?.id === data.rideId) {
+            setActiveRide(null);
+            toast("Ride was cancelled by the rider");
+          }
+        });
+
+        socket.on("connect_error", (err) => {
+          console.error("Socket connection error:", err);
+        });
+      });
+    } catch (error) {
+      console.error("Failed to setup socket:", error);
+    }
+  };
+
+  // ── GPS Location Tracking ─────────────────────────────────────────
+  const setupLocationTracking = () => {
+    if (!("geolocation" in navigator)) {
+      setLocation({ lat: -1.9441, lng: 30.0619 });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const newLocation = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+        setLocation(newLocation);
+        updateDriverLocation(newLocation);
+      },
+      () => {
+        setLocation({ lat: -1.9441, lng: 30.0619 });
+      },
+      { enableHighAccuracy: true }
+    );
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const newLocation = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+        setLocation(newLocation);
+        updateDriverLocation(newLocation);
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    );
+
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  };
+
+  // ── Update Driver Location ────────────────────────────────────────
+  const updateDriverLocation = async (loc: { lat: number; lng: number }) => {
+    if (!isOnline) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      await fetch(`${API_URL}/drivers/location`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          lat: loc.lat,
+          lng: loc.lng,
+          isOnline: isOnline,
+        }),
+      });
+    } catch (error) {
+      // Silently fail
+    }
+  };
+
+  // ── Fetch All Driver Data ─────────────────────────────────────────
+  const fetchDriverData = async () => {
     try {
       setRefreshing(true);
       setError('');
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        router.push('/login');
+        router.push("/login");
         return;
       }
-
-      const [statsData, driversData, activityData] = await Promise.all([
-        api.getStats(),
-        api.getDrivers({ limit: 10 }),
-        api.getRecentActivity().catch(() => ({ activities: [] })),
-      ]);
-
-      setStats(statsData.stats);
-      setDrivers(driversData.data || []);
-      setActivities(activityData.activities || []);
       
-      setError('');
+      // 1. Get driver stats
+      const statsRes = await fetch(`${API_URL}/drivers/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (statsRes.ok) {
+        const data = await statsRes.json();
+        if (data.success) {
+          const stats = data.stats;
+          setIsOnline(stats.isOnline || false);
+          setIsApproved(stats.isApproved || false);
+          setRating(stats.rating || 4.8);
+          setTotalTrips(stats.totalTrips || 0);
+          setDriverName(stats.name || "Driver");
+          setDriverPhone(stats.phone || "");
+          
+          if (stats.vehicle) {
+            setVehicleInfo({
+              number: stats.vehicle.number || "MT-001A",
+              model: stats.vehicle.model || "Yamaha FZ-S",
+              type: stats.vehicle.type || "MOTO",
+            });
+          }
+        }
+      }
+
+      // 2. Get earnings
+      const earningsRes = await fetch(`${API_URL}/drivers/earnings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (earningsRes.ok) {
+        const data = await earningsRes.json();
+        if (data.success && data.earnings) {
+          setEarnings({
+            today: data.earnings.today || { amount: 0, trips: 0 },
+            week: data.earnings.week || { amount: 0, trips: 0 },
+            month: data.earnings.month || { amount: 0, trips: 0 },
+          });
+        }
+      }
+
+      // 3. Get nearby rides
+      if (isApproved && isOnline) {
+        const ridesRes = await fetch(`${API_URL}/drivers/nearby-rides`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (ridesRes.ok) {
+          const data = await ridesRes.json();
+          if (data.success) {
+            setRideRequests(data.rides || []);
+          }
+        }
+      } else {
+        setRideRequests([]);
+      }
+
     } catch (err: any) {
-      console.error('Error fetching data:', err);
-      setError(err.message || 'Failed to fetch data');
-      toast.error('Failed to load dashboard data');
+      setError(err.message || 'Failed to fetch driver data');
+      toast.error('Failed to load dashboard');
     } finally {
       setRefreshing(false);
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchDriverData();
+    fetchIntervalRef.current = setInterval(fetchDriverData, 15000);
+    return () => {
+      if (fetchIntervalRef.current) {
+        clearInterval(fetchIntervalRef.current);
+      }
+    };
+  }, [isOnline, isApproved]);
 
-  // ─── Helpers ─────────────────────────────────────────────────────
-  const pendingCount = drivers.filter(d => !d.isApproved).length;
-  const approvedCount = drivers.filter(d => d.isApproved).length;
-  const onlineCount = drivers.filter(d => d.isOnline).length;
+  // ── Toggle Online Status ──────────────────────────────────────────
+  const toggleOnlineStatus = async () => {
+    if (!isApproved) {
+      toast.error('Your account is not approved yet. Please wait for admin approval.');
+      return;
+    }
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const newStatus = !isOnline;
+
+      const res = await fetch(`${API_URL}/drivers/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isOnline: newStatus }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setIsOnline(newStatus);
+          if (!newStatus) {
+            setRideRequests([]);
+          }
+          toast.success(`You are now ${newStatus ? 'online' : 'offline'}`);
+          
+          if (location) {
+            updateDriverLocation(location);
+          }
+          
+          fetchDriverData();
+        } else {
+          throw new Error(data.message || "Failed to update status");
+        }
+      } else {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to update status");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to update status. Please try again.");
+      toast.error(err.message || "Failed to update status");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) {
+  // ── Accept Ride ────────────────────────────────────────────────────
+  const acceptRide = async (rideId: string) => {
+    setAcceptedRideId(rideId);
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/drivers/accept-ride/${rideId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          const acceptedRide = rideRequests.find(r => r.id === rideId);
+          if (acceptedRide) {
+            setActiveRide({
+              ...acceptedRide,
+              status: 'ACCEPTED'
+            });
+            setRideRequests(prev => prev.filter(r => r.id !== rideId));
+            toast.success('Ride accepted! 🚀');
+            setRideStatus('Driver Assigned');
+          }
+          setError("");
+        } else {
+          throw new Error(data.message || "Failed to accept ride");
+        }
+      } else {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to accept ride");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to accept ride. Please try again.");
+      toast.error(err.message || "Failed to accept ride");
+    } finally {
+      setAcceptedRideId(null);
+      setLoading(false);
+    }
+  };
+
+  // ── Start Ride ─────────────────────────────────────────────────────
+  const startRide = async () => {
+    if (!activeRide) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/rides/${activeRide.id}/start`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setActiveRide(prev => prev ? { ...prev, status: 'STARTED' } : null);
+          setRideStatus('Trip in Progress');
+          toast.success('Trip started! 🚗');
+        } else {
+          throw new Error(data.message || "Failed to start ride");
+        }
+      } else {
+        throw new Error("Failed to start ride");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to start ride");
+      toast.error(err.message || "Failed to start ride");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Complete Ride ──────────────────────────────────────────────────
+  const completeRide = async () => {
+    if (!activeRide) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/rides/${activeRide.id}/complete`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          toast.success('🎉 Ride completed successfully!');
+          setActiveRide(null);
+          setRideStatus('');
+          fetchDriverData();
+        } else {
+          throw new Error(data.message || "Failed to complete ride");
+        }
+      } else {
+        throw new Error("Failed to complete ride");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to complete ride");
+      toast.error(err.message || "Failed to complete ride");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Reject Ride ────────────────────────────────────────────────────
+  const rejectRide = (rideId: string) => {
+    setRideRequests(prev => prev.filter(r => r.id !== rideId));
+    toast('Ride declined', { icon: '👋' });
+  };
+
+  // ── Get Status Color ──────────────────────────────────────────────
+  const getStatusColor = (status?: string) => {
+    switch (status) {
+      case 'ACCEPTED': return 'text-blue-400 bg-blue-500/20 border-blue-500/20';
+      case 'STARTED': return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/20';
+      case 'COMPLETED': return 'text-green-400 bg-green-500/20 border-green-500/20';
+      case 'CANCELLED': return 'text-red-400 bg-red-500/20 border-red-500/20';
+      default: return 'text-gray-400 bg-gray-500/20 border-gray-500/20';
+    }
+  };
+
+  if (!isApproved && !loading) {
+    return (
+      <div className="min-h-screen bg-[#080C09] flex items-center justify-center p-4">
+        <div className="bg-[#111714] border border-yellow-500/20 rounded-2xl p-8 max-w-md text-center">
+          <div className="text-6xl mb-4">⏳</div>
+          <h2 className="text-xl font-bold text-white mb-2">Account Pending Approval</h2>
+          <p className="text-gray-400 text-sm mb-4">
+            Your driver account is being reviewed by the admin team.
+            You'll receive a notification once approved.
+          </p>
+          <div className="bg-[#0A0E0B] rounded-xl p-4 text-left text-xs text-gray-500">
+            <p>📋 Vehicle: {vehicleInfo.type} • {vehicleInfo.number}</p>
+            <p>👤 Name: {driverName}</p>
+          </div>
+          <button
+            onClick={() => router.push('/driver/profile')}
+            className="mt-4 px-6 py-2 bg-green-500 text-black rounded-xl font-semibold hover:bg-green-400 transition"
+          >
+            View Profile
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && !rideRequests.length && !activeRide) {
     return (
       <div className="min-h-screen bg-[#080C09] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 text-sm">Loading dashboard...</p>
+          <Loader2 size={48} className="animate-spin text-green-500 mx-auto mb-4" />
+          <p className="text-gray-400">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -314,321 +570,311 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#080C09] text-white p-4 pb-24">
-      <div className="max-w-7xl mx-auto">
-        {/* ─── WELCOME SECTION ────────────────────────────────────── */}
-        <div className="relative mb-8">
-          <div className="bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-transparent border border-green-500/20 rounded-2xl p-6 overflow-hidden">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-green-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-            
-            <div className="relative z-10">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                      {getGreeting()}, {userName} <span className="text-2xl">👋</span>
-                    </h1>
-                    <span className="text-xs bg-green-500/20 text-green-500 px-3 py-1 rounded-full border border-green-500/20 flex items-center gap-1">
-                      <Shield size={12} /> Admin
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-sm max-w-lg">
-                    Welcome back to your MotoBus admin dashboard. Here's what's happening with your platform today.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-300">{currentTime}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date().toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })}
-                    </p>
-                  </div>
-                  {pendingCount > 0 && (
-                    <button
-                      onClick={() => router.push('/drivers/pending')}
-                      className="flex items-center gap-2 px-4 py-2 bg-yellow-500/20 rounded-xl border border-yellow-500/20 hover:bg-yellow-500/30 transition text-yellow-500 text-sm font-medium"
-                    >
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-                      {pendingCount} Pending
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 mt-4">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0A0E0B] rounded-full border border-gray-800">
-                  <Activity size={12} className="text-green-500" />
-                  <span className="text-xs text-gray-400">Active Drivers: <span className="text-white font-medium">{stats?.activeDrivers || 0}</span></span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0A0E0B] rounded-full border border-gray-800">
-                  <Target size={12} className="text-blue-500" />
-                  <span className="text-xs text-gray-400">Online: <span className="text-white font-medium">{onlineCount}</span></span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0A0E0B] rounded-full border border-gray-800">
-                  <Award size={12} className="text-yellow-500" />
-                  <span className="text-xs text-gray-400">Avg Rating: <span className="text-white font-medium">4.8 ★</span></span>
-                </div>
-                {stats?.sosAlerts && stats.sosAlerts > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 rounded-full border border-red-500/20">
-                    <AlertTriangle size={12} className="text-red-500 animate-pulse" />
-                    <span className="text-xs text-red-400">{stats.sosAlerts} Active SOS</span>
-                  </div>
-                )}
-              </div>
+      <div className="max-w-4xl mx-auto">
+        {/* ─── HEADER ────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">🚗 Driver Dashboard</h1>
+            <p className="text-gray-400 text-sm">
+              Welcome back, <span className="text-white font-medium">{driverName}</span>
+            </p>
+            {isApproved && vehicleInfo.number && (
+              <p className="text-xs text-gray-500 mt-1">
+                {vehicleInfo.type} • {vehicleInfo.number}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+              isOnline && isApproved
+                ? "bg-green-500/20 text-green-500 border border-green-500/20" 
+                : "bg-gray-500/20 text-gray-400 border border-gray-700"
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isOnline && isApproved ? "bg-green-500 animate-pulse" : "bg-gray-400"}`} />
+              {!isApproved ? "Pending" : isOnline ? "Online" : "Offline"}
             </div>
+            <button
+              onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                router.push('/login');
+              }}
+              className="p-2 hover:bg-[#1A1E1C] rounded-lg transition"
+            >
+              <LogOut size={18} className="text-gray-400" />
+            </button>
           </div>
         </div>
 
-        {/* Error */}
+        {/* ─── ONLINE TOGGLE ────────────────────────────────────────── */}
+        <button
+          onClick={toggleOnlineStatus}
+          disabled={loading || !isApproved}
+          className={`w-full py-3 rounded-xl font-semibold transition mb-6 ${
+            !isApproved
+              ? "bg-gray-500/20 text-gray-400 cursor-not-allowed"
+              : isOnline 
+                ? "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20" 
+                : "bg-green-500 text-black hover:bg-green-400"
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+              {isOnline ? "Going Offline..." : "Going Online..."}
+            </div>
+          ) : (
+            !isApproved ? "⏳ Pending Approval" :
+            isOnline ? "🔴 Go Offline" : "🟢 Go Online"
+          )}
+        </button>
+
+        {/* ─── LOCATION STATUS ──────────────────────────────────────── */}
+        {isOnline && isApproved && location && (
+          <div className="flex items-center gap-2 text-xs text-gray-400 mb-4 px-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse-dot" />
+            Location sharing active
+            <span className="text-[10px] text-gray-500 ml-auto">
+              {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+            </span>
+          </div>
+        )}
+
+        {/* ─── STATS CARDS ──────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-[#111714] border border-gray-800 rounded-xl p-4">
+            <div className="text-gray-400 text-xs uppercase tracking-wider">Today's Earnings</div>
+            <div className="text-2xl font-bold text-green-500">
+              RWF {earnings.today.amount.toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">{earnings.today.trips} rides today</div>
+          </div>
+          <div className="bg-[#111714] border border-gray-800 rounded-xl p-4">
+            <div className="text-gray-400 text-xs uppercase tracking-wider">This Week</div>
+            <div className="text-2xl font-bold text-white">
+              RWF {earnings.week.amount.toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">{earnings.week.trips} rides this week</div>
+          </div>
+          <div className="bg-[#111714] border border-gray-800 rounded-xl p-4">
+            <div className="text-gray-400 text-xs uppercase tracking-wider">Total Trips</div>
+            <div className="text-2xl font-bold text-white">{totalTrips}</div>
+          </div>
+          <div className="bg-[#111714] border border-gray-800 rounded-xl p-4">
+            <div className="text-gray-400 text-xs uppercase tracking-wider">Rating</div>
+            <div className="text-2xl font-bold text-yellow-500">{rating.toFixed(1)} ★</div>
+          </div>
+        </div>
+
+        {/* ─── ERROR ─────────────────────────────────────────────────── */}
         {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2">
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2">
             <AlertCircle size={16} />
             <span className="flex-1">{error}</span>
-            <button onClick={fetchData} className="text-green-500 hover:underline">Retry</button>
+            <button onClick={() => setError('')} className="text-gray-400 hover:text-white">✕</button>
           </div>
         )}
 
-        {/* ─── STATS GRID ──────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <StatCard 
-            icon={Users} 
-            label="Total Users" 
-            value={stats?.totalUsers || 0} 
-            change={12} 
-            color="blue"
-            loading={loading}
-            onClick={() => router.push('/users')}
-          />
-          <StatCard 
-            icon={Users2} 
-            label="Total Drivers" 
-            value={stats?.totalDrivers || 0} 
-            change={8} 
-            color="green"
-            subtitle={`${pendingCount} pending approvals`}
-            loading={loading}
-            onClick={() => router.push('/drivers')}
-          />
-          <StatCard 
-            icon={TrendingUp} 
-            label="Total Rides" 
-            value={stats?.totalRides || 0} 
-            change={15} 
-            color="purple"
-            subtitle={`${stats?.todayRides || 0} today`}
-            loading={loading}
-            onClick={() => router.push('/rides')}
-          />
-          <StatCard 
-            icon={DollarSign} 
-            label="Revenue" 
-            value={stats?.totalRevenue || 0} 
-            change={10} 
-            color="yellow"
-            subtitle={`${stats?.completionRate?.toFixed(0) || 0}% completion`}
-            loading={loading}
-            onClick={() => router.push('/payments')}
-          />
-        </div>
-
-        {/* ─── VEHICLE BREAKDOWN ───────────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div 
-            className="bg-[#111714] border border-gray-800 rounded-xl p-4 text-center hover:border-orange-500/30 transition cursor-pointer group"
-            onClick={() => router.push('/drivers?type=MOTO')}
-          >
-            <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center mx-auto mb-2 group-hover:bg-orange-500/20 transition">
-              <Bike size={24} className="text-orange-500" />
-            </div>
-            <p className="text-2xl font-bold text-white">{stats?.motoCount || 0}</p>
-            <p className="text-xs text-gray-400">Moto Drivers</p>
-          </div>
-          <div 
-            className="bg-[#111714] border border-gray-800 rounded-xl p-4 text-center hover:border-blue-500/30 transition cursor-pointer group"
-            onClick={() => router.push('/drivers?type=BUS')}
-          >
-            <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mx-auto mb-2 group-hover:bg-blue-500/20 transition">
-              <Bus size={24} className="text-blue-500" />
-            </div>
-            <p className="text-2xl font-bold text-white">{stats?.busCount || 0}</p>
-            <p className="text-xs text-gray-400">Bus Drivers</p>
-          </div>
-          <div 
-            className="bg-[#111714] border border-gray-800 rounded-xl p-4 text-center hover:border-green-500/30 transition cursor-pointer group"
-            onClick={() => router.push('/drivers?type=MINIBUS')}
-          >
-            <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mx-auto mb-2 group-hover:bg-green-500/20 transition">
-              <Truck size={24} className="text-green-500" />
-            </div>
-            <p className="text-2xl font-bold text-white">{stats?.minibusCount || 0}</p>
-            <p className="text-xs text-gray-400">Mini-Bus</p>
-          </div>
-        </div>
-
-        {/* ─── TWO COLUMN LAYOUT ───────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2 bg-[#111714] border border-gray-800 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Activity size={14} className="text-gray-400" />
-                Recent Activity
-              </h3>
-              <button 
-                onClick={() => router.push('/activity')}
-                className="text-xs text-gray-400 hover:text-white transition"
-              >
-                View All →
-              </button>
-            </div>
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {activities.length === 0 ? (
-                <div className="text-center py-8">
-                  <Clock size={32} className="text-gray-600 mx-auto mb-2" />
-                  <p className="text-gray-400 text-sm">No recent activity</p>
-                  <p className="text-xs text-gray-500">Activity will appear here</p>
-                </div>
-              ) : (
-                activities.slice(0, 6).map((activity) => (
-                  <ActivityItem key={activity.id} activity={activity} />
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="bg-[#111714] border border-gray-800 rounded-xl p-4">
-            <h3 className="text-sm font-semibold flex items-center gap-2 mb-4">
-              <Zap size={14} className="text-yellow-500" />
-              Quick Actions
+        {/* ─── RIDE REQUESTS ────────────────────────────────────────── */}
+        {isOnline && isApproved && rideRequests.length > 0 && !activeRide && (
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-400 mb-3 flex items-center gap-2">
+              <span className="text-yellow-400">🔔</span>
+              Nearby Ride Requests ({rideRequests.length})
             </h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => router.push('/drivers/pending')}
-                className="w-full flex items-center gap-3 p-3 bg-[#0A0E0B] rounded-xl hover:bg-[#1A1E1C] transition group"
-              >
-                <div className="w-9 h-9 bg-yellow-500/10 rounded-lg flex items-center justify-center group-hover:bg-yellow-500/20 transition">
-                  <UserCheck size={16} className="text-yellow-500" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium">Review Drivers</p>
-                  <p className="text-xs text-gray-500">{pendingCount} pending approvals</p>
-                </div>
-                <ChevronRight size={16} className="text-gray-400 group-hover:text-green-500 transition" />
-              </button>
-
-              <button
-                onClick={() => router.push('/notifications')}
-                className="w-full flex items-center gap-3 p-3 bg-[#0A0E0B] rounded-xl hover:bg-[#1A1E1C] transition group"
-              >
-                <div className="w-9 h-9 bg-blue-500/10 rounded-lg flex items-center justify-center group-hover:bg-blue-500/20 transition">
-                  <Bell size={16} className="text-blue-500" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium">Send Notification</p>
-                  <p className="text-xs text-gray-500">Broadcast to users</p>
-                </div>
-                <ChevronRight size={16} className="text-gray-400 group-hover:text-green-500 transition" />
-              </button>
-
-              <button
-                onClick={() => router.push('/alerts')}
-                className="w-full flex items-center gap-3 p-3 bg-[#0A0E0B] rounded-xl hover:bg-[#1A1E1C] transition group"
-              >
-                <div className="w-9 h-9 bg-red-500/10 rounded-lg flex items-center justify-center group-hover:bg-red-500/20 transition">
-                  <AlertTriangle size={16} className="text-red-500" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium">View SOS Alerts</p>
-                  <p className="text-xs text-gray-500">{stats?.sosAlerts || 0} active alerts</p>
-                </div>
-                <ChevronRight size={16} className="text-gray-400 group-hover:text-green-500 transition" />
-              </button>
-
-              <button
-                onClick={() => router.push('/reports')}
-                className="w-full flex items-center gap-3 p-3 bg-[#0A0E0B] rounded-xl hover:bg-[#1A1E1C] transition group"
-              >
-                <div className="w-9 h-9 bg-purple-500/10 rounded-lg flex items-center justify-center group-hover:bg-purple-500/20 transition">
-                  <BarChart3 size={16} className="text-purple-500" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium">View Reports</p>
-                  <p className="text-xs text-gray-500">Analytics & insights</p>
-                </div>
-                <ChevronRight size={16} className="text-gray-400 group-hover:text-green-500 transition" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* ─── PENDING DRIVERS PREVIEW ────────────────────────────── */}
-        {pendingCount > 0 && (
-          <div className="bg-[#111714] border border-yellow-500/20 rounded-xl p-4 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <UserCheck size={14} className="text-yellow-500" />
-                Pending Approvals ({pendingCount})
-                <span className="text-[10px] text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full">Action Required</span>
-              </h3>
-              <button
-                onClick={() => router.push('/drivers/pending')}
-                className="text-xs text-yellow-500 hover:text-yellow-400 transition flex items-center gap-1"
-              >
-                View All <ChevronRight size={12} />
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {drivers.filter(d => !d.isApproved).slice(0, 3).map((driver) => (
-                <div key={driver.id} className="flex items-center justify-between p-3 bg-[#0A0E0B] rounded-xl border border-yellow-500/10 hover:border-yellow-500/30 transition">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-yellow-500/10 rounded-full flex items-center justify-center">
-                      <span className="text-yellow-500 font-bold text-sm">
-                        {driver.name?.charAt(0).toUpperCase() || 'D'}
-                      </span>
-                    </div>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+              {rideRequests.map((request) => (
+                <div key={request.id} className="bg-[#111714] border border-gray-800 rounded-xl p-4 hover:border-green-500/30 transition-all">
+                  <div className="flex justify-between items-start mb-2">
                     <div>
-                      <p className="text-sm font-medium text-white">{driver.name}</p>
-                      <p className="text-xs text-gray-500">{driver.vehicleType} • {driver.vehicleNumber}</p>
+                      <p className="font-semibold text-white">{request.riderName || "Rider"}</p>
+                      <p className="text-xs text-gray-400">{request.riderPhone || "Unknown"}</p>
                     </div>
+                    <span className="text-green-500 font-bold">RWF {request.fare.toLocaleString()}</span>
                   </div>
-                  <button
-                    onClick={() => router.push(`/drivers/${driver.userId || driver.id}`)}
-                    className="px-3 py-1.5 bg-green-500/10 text-green-500 rounded-lg text-xs hover:bg-green-500/20 transition"
-                  >
-                    Review
-                  </button>
+                  <div className="space-y-1 text-sm mb-3">
+                    <p className="text-gray-400 flex items-center gap-2">
+                      <MapPin size={14} className="text-green-500" />
+                      {request.pickupAddress}
+                    </p>
+                    <p className="text-gray-400 flex items-center gap-2">
+                      <span className="text-orange-500">🏁</span> 
+                      {request.dropoffAddress}
+                    </p>
+                    {request.distance && (
+                      <p className="text-xs text-gray-500">📏 {request.distance}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => acceptRide(request.id)}
+                      disabled={loading || acceptedRideId === request.id}
+                      className="flex-1 py-2 bg-green-500 text-black rounded-xl font-semibold hover:bg-green-400 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {acceptedRideId === request.id ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Accepting...
+                        </>
+                      ) : (
+                        '✅ Accept'
+                      )}
+                    </button>
+                    <button
+                      onClick={() => rejectRide(request.id)}
+                      className="flex-1 py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl font-semibold hover:bg-red-500/20 transition"
+                    >
+                      Decline
+                    </button>
+                  </div>
                 </div>
               ))}
-              {pendingCount > 3 && (
-                <div className="flex items-center justify-center p-3 bg-[#0A0E0B] rounded-xl border border-dashed border-gray-700">
-                  <p className="text-xs text-gray-500">+{pendingCount - 3} more pending</p>
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {/* ─── FOOTER ────────────────────────────────────────────── */}
-        <div className="mt-8 pt-4 border-t border-gray-800">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
-            <p className="text-[10px] text-gray-600">
-              © {new Date().getFullYear()} MotoBus. All rights reserved.
-            </p>
-            <div className="flex items-center gap-4 text-[10px] text-gray-600">
-              <span>v2.0.1</span>
-              <span className="w-px h-3 bg-gray-800" />
-              <span>24/7 Support</span>
-              <span className="w-px h-3 bg-gray-800" />
-              <span className="flex items-center gap-1">
-                <Shield size={10} /> Secure
-              </span>
+        {/* ─── ACTIVE RIDE ──────────────────────────────────────────── */}
+        {activeRide && (
+          <div className="bg-[#111714] border border-green-500/30 rounded-xl p-4 mb-6">
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <p className="text-xs text-green-500 font-semibold uppercase tracking-wider flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${
+                    activeRide.status === 'STARTED' ? 'bg-yellow-500 animate-pulse' : 'bg-green-500 animate-pulse'
+                  }`} />
+                  {activeRide.status === 'STARTED' ? 'Trip in Progress' : 'Active Ride'}
+                </p>
+                <p className="font-bold text-white text-lg">{activeRide.riderName || "Rider"}</p>
+                <p className="text-xs text-gray-400">{activeRide.riderPhone || "Unknown"}</p>
+              </div>
+              <span className="text-green-500 font-bold text-lg">RWF {activeRide.fare.toLocaleString()}</span>
+            </div>
+            <div className="space-y-1 text-sm mb-4">
+              <p className="text-gray-400 flex items-center gap-2">
+                <MapPin size={14} className="text-green-500" />
+                From: {activeRide.pickupAddress}
+              </p>
+              <p className="text-gray-400 flex items-center gap-2">
+                <span className="text-orange-500">🏁</span> 
+                To: {activeRide.dropoffAddress}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              {activeRide.status === 'ACCEPTED' && (
+                <button
+                  onClick={startRide}
+                  disabled={loading}
+                  className="flex-1 py-2 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-400 transition disabled:opacity-50"
+                >
+                  {loading ? "Starting..." : "🚗 Start Trip"}
+                </button>
+              )}
+              {activeRide.status === 'STARTED' && (
+                <button
+                  onClick={completeRide}
+                  disabled={loading}
+                  className="flex-1 py-2 bg-green-500 text-black rounded-xl font-semibold hover:bg-green-400 transition disabled:opacity-50"
+                >
+                  {loading ? "Completing..." : "✅ Complete Ride"}
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setActiveRide(null);
+                  setRideStatus('');
+                  toast('Ride cancelled');
+                }}
+                className="flex-1 py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl font-semibold hover:bg-red-500/20 transition"
+              >
+                Cancel
+              </button>
             </div>
           </div>
+        )}
+
+        {/* ─── NO RIDES ─────────────────────────────────────────────── */}
+        {isOnline && isApproved && rideRequests.length === 0 && !activeRide && (
+          <div className="bg-[#111714] border border-gray-800 rounded-xl p-8 text-center">
+            <div className="text-5xl mb-3">🛵</div>
+            <p className="text-gray-400 font-medium">No ride requests nearby</p>
+            <p className="text-xs text-gray-500 mt-1">Waiting for riders in your area...</p>
+            <button
+              onClick={fetchDriverData}
+              className="mt-4 px-4 py-2 bg-[#0A0E0B] border border-gray-700 rounded-lg text-xs text-gray-400 hover:text-white hover:border-gray-600 transition inline-flex items-center gap-2"
+            >
+              <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+        )}
+
+        {(!isOnline || !isApproved) && !activeRide && (
+          <div className="bg-[#111714] border border-gray-800 rounded-xl p-8 text-center">
+            <div className="text-4xl mb-3">{!isApproved ? "⏳" : "⏸️"}</div>
+            <p className="text-gray-400 font-medium">
+              {!isApproved ? "Account Pending Approval" : "You are offline"}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              {!isApproved 
+                ? "Please wait for admin approval" 
+                : "Go online to receive ride requests"}
+            </p>
+          </div>
+        )}
+
+        {/* ─── NAVIGATION ───────────────────────────────────────────── */}
+        <div className="mt-6 grid grid-cols-4 gap-3">
+          <Link
+            href="/driver/earnings"
+            className="bg-[#111714] border border-gray-800 rounded-xl p-3 text-center hover:border-green-500/30 transition group"
+          >
+            <div className="text-xl mb-1 group-hover:scale-110 transition">💰</div>
+            <p className="text-xs text-gray-400">Earnings</p>
+          </Link>
+          <Link
+            href="/driver/rides"
+            className="bg-[#111714] border border-gray-800 rounded-xl p-3 text-center hover:border-green-500/30 transition group"
+          >
+            <div className="text-xl mb-1 group-hover:scale-110 transition">📋</div>
+            <p className="text-xs text-gray-400">History</p>
+          </Link>
+          <Link
+            href="/driver/profile"
+            className="bg-[#111714] border border-gray-800 rounded-xl p-3 text-center hover:border-green-500/30 transition group"
+          >
+            <div className="text-xl mb-1 group-hover:scale-110 transition">⚙️</div>
+            <p className="text-xs text-gray-400">Profile</p>
+          </Link>
+          <Link
+            href="/driver/support"
+            className="bg-[#111714] border border-gray-800 rounded-xl p-3 text-center hover:border-green-500/30 transition group"
+          >
+            <div className="text-xl mb-1 group-hover:scale-110 transition">🆘</div>
+            <p className="text-xs text-gray-400">Support</p>
+          </Link>
         </div>
+
+        {/* ─── REFRESH BUTTON ──────────────────────────────────────── */}
+        <button
+          onClick={fetchDriverData}
+          disabled={refreshing}
+          className="w-full mt-4 py-2 bg-[#0A0E0B] border border-gray-800 rounded-xl text-sm text-gray-400 hover:text-white hover:border-gray-600 transition disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+          {refreshing ? 'Refreshing...' : 'Refresh Data'}
+        </button>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.8); }
+        }
+        .animate-pulse-dot {
+          animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }
+

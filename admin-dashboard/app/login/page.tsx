@@ -129,7 +129,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
       // Redirect based on role
       if (roleUpper === "ADMIN") {
         console.log('👑 Redirecting to Admin Dashboard');
-        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_DASHBOARD_URL || 'http://localhost:3001';
+        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_DASHBOARD_URL || 'https://moto-bus-admin.onrender.com';
         window.location.href = `${adminUrl}/dashboard?token=${token}`;
       } else if (roleUpper === "DRIVER") {
         console.log('🚗 Redirecting to Driver Dashboard');

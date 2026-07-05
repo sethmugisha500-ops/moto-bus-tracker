@@ -1,13 +1,4 @@
 {
-  "name": "motobus-admin-dashboard",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",
     "@radix-ui/react-accordion": "^1.1.2",
@@ -28,17 +19,21 @@
     "@radix-ui/react-tooltip": "^1.0.7",
     "@tanstack/react-query": "^5.8.4",
     "@tanstack/react-query-devtools": "^5.8.4",
+    "autoprefixer": "^10.4.16",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
     "lucide-react": "^0.294.0",
     "next": "^16.2.9",
+    "postcss": "^8.4.31",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.48.2",
     "react-hot-toast": "^2.4.1",
     "recharts": "^2.10.3",
+    "socket.io-client": "^4.8.1",
     "tailwind-merge": "^2.1.0",
+    "tailwindcss": "^3.3.6",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.22.4"
   },
@@ -46,11 +41,8 @@
     "@types/node": "^20.10.3",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
-    "autoprefixer": "^10.4.16",
     "eslint": "^8.54.0",
     "eslint-config-next": "14.0.4",
-    "postcss": "^8.4.31",
-    "tailwindcss": "^3.3.6",
     "typescript": "^5.3.3"
   }
 }

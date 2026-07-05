@@ -1400,7 +1400,7 @@ if (status === (window as any).google.maps.DirectionsStatus.OK) {              r
             zoom={14}
             onLoad={(map) => {
               mapRef.current = map;
-              directionsService.current = new google.maps.DirectionsService();
+              directionsService.current = new (window as any).google.maps.DirectionsService();
             }}
             options={{
               zoomControl: true,

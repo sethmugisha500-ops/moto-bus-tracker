@@ -589,8 +589,7 @@ useEffect(() => {
             provideRouteAlternatives: true,
           },
           (result: any, status: any) => {
-            if (status === google.maps.DirectionsStatus.OK) {
-              resolve(result);
+if (status === (window as any).google.maps.DirectionsStatus.OK) {              resolve(result);
             } else {
               reject(new Error(`Directions request failed: ${status}`));
             }

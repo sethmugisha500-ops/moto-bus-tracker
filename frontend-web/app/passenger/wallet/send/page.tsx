@@ -7,20 +7,16 @@ import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
   Send,
-  User,
   Phone,
-  Mail,
   Check,
   Loader2,
   AlertCircle,
-  ArrowRight,
   Users,
   QrCode
 } from "lucide-react";
-import { useFlutterwave, closePaymentModal } from "flutterwave-react-v3";
 import { useWalletStore } from "@/store/wallet.store";
 
-const FLW_PUBLIC_KEY = process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY || "";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://moto-bus-backend.onrender.com/api';
 
 const RECENT_CONTACTS = [
   { id: 1, name: "John Doe", phone: "0788123456", avatar: "JD" },
@@ -43,89 +39,62 @@ export default function SendMoneyPage() {
 
   const validate = (): string | null => {
     if (!recipient.trim()) return "Please enter recipient phone number";
-
     const phoneDigits = recipient.replace(/\D/g, "");
     if (phoneDigits.length < 9) return "Please enter a valid phone number";
-
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount < 100) return "Please enter a valid amount (minimum 100 RWF)";
-
     if (numAmount > (wallet?.balance || 0)) return "Insufficient balance";
-
     return null;
   };
 
   const numAmount = parseFloat(amount) || 0;
 
-  // ── Flutterwave Config (test mode) ──────────────────────────────
-  const flutterwaveConfig = {
-    public_key: FLW_PUBLIC_KEY,
-    tx_ref: `motobus-send-${Date.now()}`,
-    amount: numAmount,
-    currency: "RWF",
-    payment_options: "mobilemoneyrwanda,card",
-    customer: {
-      email: "sethmugisha500@gmaial.com",
-      phone_number: recipient || "0798750913",
-      name: recipientName || "MotoBus Wallet Transfer",
-    },
-    customizations: {
-      title: "MotoBus Wallet Transfer",
-      description: `Send RWF ${numAmount.toLocaleString()} to ${recipientName || recipient}`,
-      logo: "https://your-logo-url.com/logo.png",
-    },
-  };
-
-  const handleFlutterPayment = useFlutterwave(flutterwaveConfig);
-
-  const handleSend = () => {
+  // ─── Handle Send - Direct API Call ──────────────────────────────
+  const handleSend = async () => {
     const validationError = validate();
     if (validationError) {
       setError(validationError);
       return;
     }
 
-    if (!FLW_PUBLIC_KEY) {
-      setError("Payment system not configured. Please contact support.");
-      return;
-    }
-
     setError("");
     setLoading(true);
 
-    // Real Flutterwave test-mode checkout — this is the "simulation":
-    // Flutterwave's own test environment handles the realistic delay,
-    // success/failure states, and provider UI. No fake setTimeout needed.
-    handleFlutterPayment({
-      callback: async (response) => {
-        closePaymentModal();
+    try {
+      const token = localStorage.getItem('token');
+
+      console.log('📤 Sending payment request...');
+      console.log('📤 Amount:', numAmount);
+      console.log('📤 Recipient:', recipient);
+
+      const response = await fetch(`${API_URL}/payment/wallet/topup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          amount: numAmount,
+          recipient: recipient,
+          note: note,
+        }),
+      });
+
+      const data = await response.json();
+      console.log('📥 Response:', data);
+
+      if (data.success && data.data?.link) {
+        // ✅ Redirect to Flutterwave payment page
+        window.location.href = data.data.link;
+      } else {
+        setError(data.message || 'Payment initialization failed');
         setLoading(false);
-
-        if (response.status === "successful" || response.status === "completed") {
-          setTxId(String(response.transaction_id));
-
-          // Refresh wallet + transactions from the store after a
-          // confirmed transfer. Wrapped defensively in case the
-          // backend wallet endpoints aren't wired up yet.
-          try {
-            await fetchWallet();
-            await fetchTransactions({ limit: 10 });
-          } catch {
-            // Non-fatal — Flutterwave already confirmed the transfer.
-          }
-
-          setSuccess(true);
-          setTimeout(() => {
-            router.push("/passenger/wallet");
-          }, 2200);
-        } else {
-          setError("Payment was not completed. Please try again.");
-        }
-      },
-      onClose: () => {
-        setLoading(false);
-      },
-    });
+      }
+    } catch (error) {
+      console.error('❌ Payment error:', error);
+      setError('An error occurred during payment');
+      setLoading(false);
+    }
   };
 
   if (success) {
@@ -140,9 +109,6 @@ export default function SendMoneyPage() {
             RWF {parseFloat(amount).toLocaleString()} sent to {recipientName || recipient}
           </p>
           <p className="text-xs text-gray-500 font-mono">Transaction ID: {txId}</p>
-          <p className="text-[10px] text-yellow-500/70 mt-3">
-            ⚠️ Flutterwave test mode — no real funds moved
-          </p>
         </div>
       </div>
     );
@@ -162,7 +128,7 @@ export default function SendMoneyPage() {
           </span>
         </div>
 
-        {/* Flutterwave test mode notice */}
+        {/* Test Mode Notice */}
         <div className="mb-4 px-3 py-2 bg-yellow-500/5 border border-yellow-500/15 rounded-xl text-xs text-yellow-500/80 flex items-center gap-2">
           <AlertCircle size={14} />
           Test mode — powered by Flutterwave sandbox, no real money moves
@@ -286,7 +252,7 @@ export default function SendMoneyPage() {
           {loading ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              Sending...
+              Processing...
             </>
           ) : (
             <>
@@ -296,7 +262,6 @@ export default function SendMoneyPage() {
           )}
         </button>
 
-        {/* Fee Info */}
         <p className="text-xs text-gray-500 text-center mt-4">
           💰 Transaction fee: 0 RWF • Instant transfer
         </p>

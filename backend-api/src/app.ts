@@ -103,6 +103,7 @@ import otpRoutes from './routes/otp';
 import driverRoutes from './routes/drivers';
 import riderRoutes from './routes/riders';
 import adminRoutes from './routes/admin';
+import paymentRoutes from './routes/payment.routes';
 
 console.log('📦 Mounting routes...');
 app.use('/api/auth', authRoutes);
@@ -116,6 +117,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/landing', landingRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/payment', paymentRoutes);
 
 console.log('✅ All routes mounted');
 

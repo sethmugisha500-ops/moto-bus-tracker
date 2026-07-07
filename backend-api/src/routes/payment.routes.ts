@@ -241,9 +241,7 @@ router.get('/callback', async (req: Request, res: Response) => {
 });
 
 // ─── GET /api/payment/transactions ──────────────────────────────────
-router.get('/transactions', async () => {
-  authenticate
-}, async (req: Request, res: Response) => {
+router.get('/transactions', auth, async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
     if (!userId) {

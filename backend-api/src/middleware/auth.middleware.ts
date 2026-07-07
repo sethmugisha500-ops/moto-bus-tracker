@@ -30,8 +30,7 @@ export const authenticate = async (
     if (!token) {
       throw new AppError('Authentication required', 401);
     }
-    const JWT_SECRET = process.env.JWT_SECRET || 'motobus_secret_key';
-
+const JWT_SECRET = process.env.JWT_SECRET || 'motobus_secret_key_fallback';
     const decoded = jwt.verify(token, env.JWT_SECRET) as any;
     console.log('🔑 Decoded token:', decoded);
 

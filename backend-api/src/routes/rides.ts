@@ -905,5 +905,46 @@ router.put('/:id/cancel', authenticate, async (req: AuthRequest, res: Response) 
     });
   }
 });
+// backend-api/src/routes/rides.ts
+
+// ─── GET /api/rides/history ──────────────────────────────────────────
+router.get('/history', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const rides = await prisma.ride.findMany({
+      where: { riderId: userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              }
+            }
+          }
+        }
+      },
+      take: 50
+    });
+
+    return res.json({
+      success: true,
+      data: rides
+    });
+  } catch (error: any) {
+    console.error('Get ride history error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 
 export default router;

@@ -1,18 +1,16 @@
-// src/middleware/auth.middleware.ts
+// backend-api/src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
-import { env } from '../config/env';
 import { AppError } from './errorHandler';
 
 export interface AuthRequest extends Request {
-  req: { id: string; phone: string; name: string; role: import(".prisma/client").$Enums.UserRole; };
   user?: {
-    email: string | null;
     id: string;
+    email: string | null;
     phone: string;
-    role: string;
     name?: string;
+    role: string;
   };
 }
 
@@ -27,15 +25,28 @@ export const authenticate = async (
       ? authHeader.split(' ')[1] 
       : null;
 
+    console.log('🔑 Auth header:', authHeader ? 'Present' : 'Missing');
+    console.log('🔑 Token:', token ? 'Present (starts with ' + token.substring(0, 20) + '...)' : 'Missing');
+
     if (!token) {
       throw new AppError('Authentication required', 401);
     }
-const JWT_SECRET = process.env.JWT_SECRET || 'motobus_secret_key_fallback';
-    const decoded = jwt.verify(token, env.JWT_SECRET) as any;
+
+    // ✅ Use process.env.JWT_SECRET directly (consistent with auth.controller.ts)
+    const JWT_SECRET = process.env.JWT_SECRET || 'motobus_secret_key_fallback';
+    console.log('🔑 Using JWT_SECRET:', JWT_SECRET.substring(0, 10) + '...');
+
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
     console.log('🔑 Decoded token:', decoded);
 
+    // ✅ Get user ID from either 'userId' or 'id' field
+    const userId = decoded.userId || decoded.id;
+    if (!userId) {
+      throw new AppError('Invalid token: No user ID', 401);
+    }
+
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -52,7 +63,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'motobus_secret_key_fallback';
     req.user = user;
     next();
   } catch (error: any) {
-    console.error('Auth error:', error.message);
+    console.error('❌ Auth error:', error.message);
     
     if (error instanceof AppError) {
       res.status(error.statusCode).json({ 
@@ -62,14 +73,15 @@ const JWT_SECRET = process.env.JWT_SECRET || 'motobus_secret_key_fallback';
       return;
     }
 
+    // ✅ Return consistent error message
     res.status(401).json({ 
       success: false, 
-      message: 'Invalid or expired token' 
+      message: error.message === 'jwt expired' ? 'Session expired. Please login again.' : 'Invalid or expired token'
     });
   }
 };
 
-// ✅ Role-based authorization middleware
+// ─── Role-based authorization middleware ──────────────────────────
 export const requireRole = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
@@ -92,11 +104,9 @@ export const requireRole = (...roles: string[]) => {
   };
 };
 
-// ✅ Convenience middleware for admin
+// ─── Convenience middleware ──────────────────────────────────────
 export const requireAdmin = requireRole('ADMIN');
-
-// ✅ Convenience middleware for driver
 export const requireDriver = requireRole('DRIVER', 'ADMIN');
 
-// ✅ Authorization helper
+// ─── Authorization helper ────────────────────────────────────────
 export const authorize = requireRole;

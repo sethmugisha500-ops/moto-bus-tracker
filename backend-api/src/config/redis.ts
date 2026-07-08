@@ -1,28 +1,38 @@
 // src/config/redis.ts
-import Redis from 'ioredis';
+// ─── Comment out the entire file ──────────────────────────────────
+// import Redis from 'ioredis';
+//
+// const redis = new Redis({
+//   host: process.env.REDIS_HOST || 'localhost',
+//   port: parseInt(process.env.REDIS_PORT || '6379'),
+//   password: process.env.REDIS_PASSWORD || undefined,
+//   db: parseInt(process.env.REDIS_DB || '0'),
+//   retryStrategy: (times) => {
+//     const delay = Math.min(times * 50, 2000);
+//     return delay;
+//   },
+//   maxRetriesPerRequest: 3,
+// });
+//
+// redis.on('connect', () => {
+//   console.log('🔴 Redis connected successfully');
+// });
+//
+// redis.on('error', (error) => {
+//   console.error('🔴 Redis connection error:', error);
+// });
+//
+// redis.on('close', () => {
+//   console.log('🔴 Redis connection closed');
+// });
+//
+// export default redis;
 
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || undefined,
-  db: parseInt(process.env.REDIS_DB || '0'),
-  retryStrategy: (times) => {
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  },
-  maxRetriesPerRequest: 3,
-});
-
-redis.on('connect', () => {
-  console.log('🔴 Redis connected successfully');
-});
-
-redis.on('error', (error) => {
-  console.error('🔴 Redis connection error:', error);
-});
-
-redis.on('close', () => {
-  console.log('🔴 Redis connection closed');
-});
-
-export default redis;
+// ─── Export a dummy Redis object ──────────────────────────────────
+export default {
+  get: async () => null,
+  set: async () => null,
+  del: async () => null,
+  on: () => {},
+  quit: async () => {},
+};

@@ -946,5 +946,135 @@ router.get('/history', authenticate, async (req: AuthRequest, res: Response) => 
     });
   }
 });
+// backend-api/src/routes/rides.ts
+
+// ─── PUT /api/rides/:id/cancel ──────────────────────────────────────
+router.put('/:id/cancel', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    const { reason } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+
+    // Get the ride
+    const existingRide = await prisma.ride.findUnique({
+      where: { id },
+      include: {
+        rider: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          }
+        },
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!existingRide) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ride not found'
+      });
+    }
+
+    // Check if user is authorized (rider OR driver)
+    const isRider = existingRide.riderId === userId;
+    const isDriver = existingRide.driverId === userId;
+
+    if (!isRider && !isDriver) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized to cancel this ride'
+      });
+    }
+
+    // Check if ride can be cancelled
+    if (['COMPLETED', 'CANCELLED'].includes(existingRide.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Ride cannot be cancelled in ${existingRide.status} status`
+      });
+    }
+
+    // Update ride
+    const updatedRide = await prisma.ride.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED' as RideStatus,
+        cancelledAt: new Date(),
+      },
+      include: {
+        rider: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          }
+        },
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Set driver back online if assigned
+    if (updatedRide.driverId) {
+      await prisma.driver.update({
+        where: { id: updatedRide.driverId },
+        data: { isOnline: true }
+      });
+    }
+
+    // ─── EMIT SOCKET EVENT ──────────────────────────────────────────
+    const emitToRider = req.app.get('emitToRider');
+
+    if (emitToRider) {
+      emitToRider(updatedRide.riderId, 'ride-cancelled', {
+        rideId: id,
+        ride: updatedRide,
+        reason: reason || 'Ride was cancelled',
+        cancelledBy: isRider ? 'rider' : 'driver'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Ride cancelled successfully',
+      data: updatedRide
+    });
+
+  } catch (error: any) {
+    console.error('❌ Cancel ride error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 
 export default router;

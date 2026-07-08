@@ -286,7 +286,6 @@ router.post('/drivers/:id/approve', async (req: Request, res: Response) => {
       }
     });
 
-    // Create wallet if not exists - remove 'currency' field
     await prisma.wallet.upsert({
       where: { userId: driver.userId },
       update: {},
@@ -390,7 +389,6 @@ router.put('/drivers/:id/approve', async (req: Request, res: Response) => {
 // ─── USER MANAGEMENT ─────────────────────────────────────────────────
 // ──────────────────────────────────────────────────────────────────────
 
-// ─── GET /api/admin/users ──────────────────────────────────────────
 router.get('/users', async (req: Request, res: Response) => {
   try {
     if (!await isAdmin(req)) {
@@ -433,7 +431,6 @@ router.get('/users', async (req: Request, res: Response) => {
   }
 });
 
-// ─── POST /api/admin/users ──────────────────────────────────────────
 router.post('/users', async (req: Request, res: Response) => {
   try {
     if (!await isAdmin(req)) {
@@ -474,7 +471,6 @@ router.post('/users', async (req: Request, res: Response) => {
       });
     }
 
-    // Remove 'currency' field
     await prisma.wallet.create({
       data: {
         userId: user.id,
@@ -557,6 +553,355 @@ router.get('/earnings', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Get earnings error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// ─── REPORTS ──────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────────
+
+// ─── GET /api/admin/reports ──────────────────────────────────────────
+router.get('/reports', async (req: Request, res: Response) => {
+  try {
+    if (!await isAdmin(req)) {
+      return res.status(403).json({ success: false, message: 'Admin access required' });
+    }
+
+    const { period = 'week', vehicleType = 'all', startDate, endDate } = req.query;
+
+    // Calculate date range
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    if (startDate && endDate) {
+      start = new Date(startDate as string);
+      end = new Date(endDate as string);
+    } else {
+      switch (period) {
+        case 'today':
+          start.setHours(0, 0, 0, 0);
+          end = new Date();
+          break;
+        case 'week':
+          start.setDate(now.getDate() - 7);
+          end = new Date();
+          break;
+        case 'month':
+          start.setMonth(now.getMonth() - 1);
+          end = new Date();
+          break;
+        case 'quarter':
+          start.setMonth(now.getMonth() - 3);
+          end = new Date();
+          break;
+        case 'year':
+          start.setFullYear(now.getFullYear() - 1);
+          end = new Date();
+          break;
+        default:
+          start.setDate(now.getDate() - 7);
+          end = new Date();
+      }
+    }
+
+    // Build where clause for completed rides
+    const rideWhereClause: any = {
+      status: 'COMPLETED' as RideStatus,
+      completedAt: { gte: start, lte: end }
+    };
+
+    // Vehicle type filter - get driver IDs with this vehicle type
+    if (vehicleType !== 'all') {
+      const vehicleTypeEnum = getVehicleType(vehicleType as string);
+      if (vehicleTypeEnum) {
+        const drivers = await prisma.driver.findMany({
+          where: { vehicleType: vehicleTypeEnum },
+          select: { id: true }
+        });
+        const driverIds = drivers.map(d => d.id);
+        if (driverIds.length > 0) {
+          rideWhereClause.driverId = { in: driverIds };
+        } else {
+          // No drivers of this type, return empty data
+          return res.json({
+            success: true,
+            stats: {
+              totalTrips: 0,
+              totalRevenue: 0,
+              averageRating: 0,
+              completionRate: 0,
+              activeDrivers: 0,
+              totalVehicles: 0,
+              pendingRides: 0,
+              totalUsers: 0,
+              tripsGrowth: 0,
+              revenueGrowth: 0,
+            },
+            chartData: [],
+            distribution: [],
+            topDrivers: [],
+            ratings: [
+              { rating: 5, count: 0, percentage: 0 },
+              { rating: 4, count: 0, percentage: 0 },
+              { rating: 3, count: 0, percentage: 0 },
+              { rating: 2, count: 0, percentage: 0 },
+              { rating: 1, count: 0, percentage: 0 },
+            ],
+          });
+        }
+      }
+    }
+
+    // ─── Get Stats ──────────────────────────────────────────────────
+    const [
+      totalTrips,
+      totalRevenue,
+      avgRatingResult,
+      completedRidesCount,
+      activeDriversCount,
+      totalVehiclesCount,
+      pendingRidesCount,
+      totalUsersCount
+    ] = await Promise.all([
+      prisma.ride.count({ where: rideWhereClause }),
+      prisma.ride.aggregate({
+        where: rideWhereClause,
+        _sum: { fare: true }
+      }),
+      // Get average rating from completed rides' drivers
+      prisma.driver.aggregate({
+        where: {
+          isApproved: true,
+          rides: {
+            some: {
+              status: 'COMPLETED' as RideStatus,
+              completedAt: { gte: start, lte: end }
+            }
+          }
+        },
+        _avg: { rating: true }
+      }),
+      prisma.ride.count({
+        where: {
+          ...rideWhereClause,
+          status: 'COMPLETED' as RideStatus
+        }
+      }),
+      // Active drivers - drivers who completed rides in the period
+      prisma.driver.count({
+        where: {
+          isApproved: true,
+          isOnline: true,
+          rides: {
+            some: {
+              status: 'COMPLETED' as RideStatus,
+              completedAt: { gte: start, lte: end }
+            }
+          }
+        }
+      }),
+      prisma.driver.count({ where: { isApproved: true } }),
+      prisma.ride.count({
+        where: {
+          status: 'PENDING' as RideStatus,
+          createdAt: { gte: start, lte: end }
+        }
+      }),
+      prisma.user.count()
+    ]);
+
+    const totalRides = totalTrips || 0;
+    const completedRides = completedRidesCount || 0;
+
+    // ─── Get previous period for growth calculation ────────────────
+    const periodDuration = end.getTime() - start.getTime();
+    const prevStart = new Date(start.getTime() - periodDuration);
+    const prevEnd = new Date(start);
+
+    const prevPeriodWhere = {
+      ...rideWhereClause,
+      completedAt: { gte: prevStart, lte: prevEnd }
+    };
+    delete prevPeriodWhere.completedAt;
+
+    const [prevTrips, prevRevenue] = await Promise.all([
+      prisma.ride.count({
+        where: {
+          ...prevPeriodWhere,
+          status: 'COMPLETED' as RideStatus,
+          completedAt: { gte: prevStart, lte: prevEnd }
+        }
+      }),
+      prisma.ride.aggregate({
+        where: {
+          ...prevPeriodWhere,
+          status: 'COMPLETED' as RideStatus,
+          completedAt: { gte: prevStart, lte: prevEnd }
+        },
+        _sum: { fare: true }
+      })
+    ]);
+
+    const prevTripsCount = prevTrips || 0;
+    const prevRevenueAmount = prevRevenue._sum?.fare || 0;
+
+    const tripsGrowth = prevTripsCount > 0 
+      ? ((totalRides - prevTripsCount) / prevTripsCount) * 100 
+      : totalRides > 0 ? 100 : 0;
+
+    const revenueGrowth = prevRevenueAmount > 0 
+      ? ((totalRevenue._sum?.fare || 0 - prevRevenueAmount) / prevRevenueAmount) * 100 
+      : (totalRevenue._sum?.fare || 0) > 0 ? 100 : 0;
+
+    const stats = {
+      totalTrips: totalRides,
+      totalRevenue: totalRevenue._sum?.fare || 0,
+      averageRating: avgRatingResult._avg?.rating || 0,
+      completionRate: totalRides > 0 ? (completedRides / totalRides) * 100 : 0,
+      activeDrivers: activeDriversCount || 0,
+      totalVehicles: totalVehiclesCount || 0,
+      pendingRides: pendingRidesCount || 0,
+      totalUsers: totalUsersCount || 0,
+      tripsGrowth: Math.round(tripsGrowth * 100) / 100,
+      revenueGrowth: Math.round(revenueGrowth * 100) / 100,
+    };
+
+    // ─── Chart Data ──────────────────────────────────────────────────
+    // Use raw SQL for date grouping
+    const chartData = await prisma.$queryRaw`
+      SELECT 
+        DATE(completed_at) as name,
+        COUNT(*)::int as trips,
+        COALESCE(SUM(fare), 0) as revenue
+      FROM "Ride"
+      WHERE completed_at >= ${start}
+        AND completed_at <= ${end}
+        AND status = 'COMPLETED'
+      GROUP BY DATE(completed_at)
+      ORDER BY name ASC
+      LIMIT 30
+    `;
+
+    // ─── Vehicle Distribution ───────────────────────────────────────
+    const vehicleLabels: Record<string, string> = {
+      MOTO: 'Motorcycle',
+      BUS: 'Bus',
+      MINIBUS: 'Minibus',
+    };
+    const vehicleColors: Record<string, string> = {
+      MOTO: '#2563eb',
+      BUS: '#10b981',
+      MINIBUS: '#f59e0b',
+    };
+    const vehicleIcons: Record<string, string> = {
+      MOTO: 'motorcycle',
+      BUS: 'bus',
+      MINIBUS: 'minibus',
+    };
+
+    const vehicleDist = await prisma.driver.groupBy({
+      by: ['vehicleType'],
+      _count: {
+        id: true
+      },
+      where: {
+        isApproved: true
+      }
+    });
+
+    const distribution = vehicleDist.map((v: any) => ({
+      name: vehicleLabels[v.vehicleType as keyof typeof vehicleLabels] || v.vehicleType,
+      value: v._count.id,
+      color: vehicleColors[v.vehicleType as keyof typeof vehicleColors] || '#888',
+      icon: vehicleIcons[v.vehicleType as keyof typeof vehicleIcons] || 'vehicle',
+    }));
+
+    // ─── Top Drivers ─────────────────────────────────────────────────
+    const topDrivers = await prisma.driver.findMany({
+      where: {
+        isApproved: true,
+        rides: {
+          some: {
+            status: 'COMPLETED' as RideStatus,
+            completedAt: { gte: start, lte: end }
+          }
+        }
+      },
+      select: {
+        id: true,
+        user: {
+          select: { name: true, phone: true }
+        },
+        vehicleType: true,
+        vehicleNumber: true,
+        rating: true,
+        rides: {
+          where: {
+            status: 'COMPLETED' as RideStatus,
+            completedAt: { gte: start, lte: end }
+          },
+          select: { fare: true }
+        }
+      },
+      orderBy: {
+        rides: {
+          _count: 'desc'
+        }
+      },
+      take: 10
+    });
+
+    const formattedTopDrivers = topDrivers.map((driver: any) => ({
+      id: driver.id,
+      name: driver.user?.name || 'Unknown',
+      phone: driver.user?.phone || '',
+      trips: driver.rides?.length || 0,
+      rating: driver.rating || 0,
+      earnings: driver.rides?.reduce((sum: number, r: any) => sum + (r.fare || 0), 0) || 0,
+      vehicleType: driver.vehicleType,
+      vehicleNumber: driver.vehicleNumber || 'N/A',
+    }));
+
+    // ─── Rating Distribution ────────────────────────────────────────
+    const ratingData = await prisma.rating.groupBy({
+      by: ['rating'],
+      _count: true,
+      where: {
+        createdAt: { gte: start, lte: end }
+      }
+    });
+
+    const totalRatings = ratingData.reduce((sum, r) => sum + r._count, 0);
+    const ratings = ratingData.map((r: any) => ({
+      rating: r.rating,
+      count: r._count,
+      percentage: totalRatings > 0 ? Math.round((r._count / totalRatings) * 100) : 0
+    }));
+
+    // Ensure all rating levels are present
+    const ratingMap = new Map(ratings.map(r => [r.rating, r]));
+    const defaultRatings = [
+      { rating: 5, count: 0, percentage: 0 },
+      { rating: 4, count: 0, percentage: 0 },
+      { rating: 3, count: 0, percentage: 0 },
+      { rating: 2, count: 0, percentage: 0 },
+      { rating: 1, count: 0, percentage: 0 },
+    ];
+    const finalRatings = defaultRatings.map(r => ratingMap.get(r.rating) || r);
+
+    res.json({
+      success: true,
+      stats,
+      chartData: chartData || [],
+      distribution,
+      topDrivers: formattedTopDrivers,
+      ratings: finalRatings,
+    });
+
+  } catch (error: any) {
+    console.error('Reports error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

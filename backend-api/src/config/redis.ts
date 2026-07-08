@@ -1,38 +1,39 @@
 // src/config/redis.ts
-// ─── Comment out the entire file ──────────────────────────────────
-// import Redis from 'ioredis';
-//
-// const redis = new Redis({
-//   host: process.env.REDIS_HOST || 'localhost',
-//   port: parseInt(process.env.REDIS_PORT || '6379'),
-//   password: process.env.REDIS_PASSWORD || undefined,
-//   db: parseInt(process.env.REDIS_DB || '0'),
-//   retryStrategy: (times) => {
-//     const delay = Math.min(times * 50, 2000);
-//     return delay;
-//   },
-//   maxRetriesPerRequest: 3,
-// });
-//
-// redis.on('connect', () => {
-//   console.log('🔴 Redis connected successfully');
-// });
-//
-// redis.on('error', (error) => {
-//   console.error('🔴 Redis connection error:', error);
-// });
-//
-// redis.on('close', () => {
-//   console.log('🔴 Redis connection closed');
-// });
-//
-// export default redis;
+import Redis from 'ioredis';
 
-// ─── Export a dummy Redis object ──────────────────────────────────
-export default {
-  get: async () => null,
-  set: async () => null,
-  del: async () => null,
-  on: () => {},
-  quit: async () => {},
-};
+let redis: any = null;
+
+try {
+  // Only connect if Redis URL is provided
+  if (process.env.REDIS_URL) {
+    redis = new Redis({
+      host: process.env.REDIS_HOST || 'localhost',
+      port: parseInt(process.env.REDIS_PORT || '6379'),
+      password: process.env.REDIS_PASSWORD || undefined,
+      db: parseInt(process.env.REDIS_DB || '0'),
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 50, 2000);
+        return delay;
+      },
+      maxRetriesPerRequest: 3,
+    });
+
+    redis.on('connect', () => {
+      console.log('🔴 Redis connected successfully');
+    });
+
+    redis.on('error', (error: Error) => {
+      console.error('🔴 Redis connection error:', error);
+    });
+
+    redis.on('close', () => {
+      console.log('🔴 Redis connection closed');
+    });
+  } else {
+    console.log('⚠️ Redis not configured - running without cache');
+  }
+} catch (error) {
+  console.log('⚠️ Redis not available - running without cache');
+}
+
+export default redis;
